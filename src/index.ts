@@ -87,7 +87,10 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
 
   } catch (error: any) {
     const { core: coreLib = core } = deps;
-    coreLib.setFailed(`Action failed: ${error.message}`);
+    // Import mapJiraError here to handle JIRA-specific errors
+    const { mapJiraError } = await import('./jira');
+    const errorMessage = mapJiraError(error);
+    coreLib.setFailed(errorMessage);
   }
 }
 
