@@ -1,0 +1,30 @@
+name: 'JIRA Autolinks Sync'
+description: 'Sync JIRA queues with GitHub repository autolinks'
+author: 'IlyaGulya'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+  jira-url:
+    description: 'JIRA instance URL'
+    required: true
+  jira-username:
+    description: 'JIRA username'
+    required: true
+  jira-api-token:
+    description: 'JIRA API token'
+    required: true
+  repository:
+    description: 'Repository in format owner/repo'
+    required: false
+    default: ${{ github.repository }}
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+branding:
+  icon: 'link'
+  color: 'blue'

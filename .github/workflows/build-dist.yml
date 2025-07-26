@@ -1,0 +1,49 @@
+name: Build and Update Dist
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build-dist:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+
+    - name: Install dependencies
+      run: bun install
+
+    - name: Run tests
+      run: bun test
+
+    - name: Build project
+      run: bun run build
+
+    - name: Check for changes in dist
+      id: verify-changed-files
+      # language=bash
+      run: |
+        if [ -n "$(git status --porcelain dist/)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Commit and push if dist changed
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      # language=bash
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add dist/
+        git commit -m "chore: update dist with latest build [skip ci]"
+        git push
