@@ -1,200 +1,10 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import type {
-  RestEndpointMethodTypes
-} from "@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
+import { SyncDependencies, GithubAutolink } from './types';
+import { getJiraQueues } from './jira';
+import { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
 
-interface JiraProject {
-  key: string;
-  name: string;
-  id: string;
-}
-
-interface JiraApiError extends Error {
-  response?: {
-    status: number;
-    data: any;
-    headers: Record<string, string>;
-  };
-  code?: string;
-}
-
-type GithubAutolink = RestEndpointMethodTypes["repos"]["getAutolink"]["response"]["data"]
-
-interface SyncDependencies {
-  core?: typeof core;
-  githubLib?: typeof github;
-  http?: typeof fetch;
-}
-
-async function getJiraQueues(
-  jiraUrl: string,
-  username: string,
-  apiToken: string,
-  http: typeof fetch = fetch
-): Promise<JiraProject[]> {
-  try {
-    const auth = Buffer.from(`${username}:${apiToken}`).toString('base64');
-
-    // Get all projects (which contain queues/issues)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    const response = await http(`${jiraUrl}/rest/api/3/project`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as JiraApiError;
-      error.response = {
-        status: response.status,
-        data: errorData,
-        headers: Object.fromEntries(response.headers.entries())
-      };
-      throw error;
-    }
-
-    const data = await response.json();
-
-    if (!data || !Array.isArray(data)) {
-      throw new Error('Invalid response format from JIRA API');
-    }
-
-    return data.map((project: any) => ({
-      key: project.key,
-      name: project.name,
-      id: project.id
-    })).filter((project: JiraProject) => project.key); // Filter out projects without keys
-  } catch (error: any) {
-    let errorMessage: string;
-
-    if (error.response) {
-      const status = error.response.status;
-      const errorData = error.response.data;
-
-      switch (status) {
-        case 401:
-          errorMessage = 'JIRA authentication failed. Please check your username and API token.';
-          if (errorData?.errorMessages?.length > 0) {
-            errorMessage += ` Details: ${errorData.errorMessages.join(', ')}`;
-          }
-          break;
-        case 403:
-          errorMessage = 'Access denied to JIRA projects. Please check your permissions.';
-          if (errorData?.errorMessages?.length > 0) {
-            errorMessage += ` Details: ${errorData.errorMessages.join(', ')}`;
-          }
-          break;
-        case 404:
-          errorMessage = 'JIRA instance not found. Please check your JIRA URL.';
-          break;
-        case 429:
-          const retryAfter = error.response.headers['retry-after'] || 'unknown';
-          errorMessage = `JIRA API rate limit exceeded. Retry after: ${retryAfter} seconds.`;
-          break;
-        case 500:
-        case 502:
-        case 503:
-        case 504:
-          errorMessage = `JIRA server error (${status}). Please try again later or contact your JIRA administrator.`;
-          break;
-        default:
-          errorMessage = `JIRA API error (${status}): ${error.message}`;
-      }
-    } else if (error.name === 'AbortError') {
-      errorMessage = 'JIRA API request timed out. Please check your network connection or try again later.';
-    } else if (error.code) {
-      switch (error.code) {
-        case 'ENOTFOUND':
-          errorMessage = 'Cannot resolve JIRA URL. Please check that the JIRA URL is correct and accessible.';
-          break;
-        case 'ECONNREFUSED':
-          errorMessage = 'Connection to JIRA refused. Please check your JIRA URL and network connectivity.';
-          break;
-        case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
-          errorMessage = 'SSL certificate verification failed for JIRA instance. Please check the certificate or contact your administrator.';
-          break;
-        default:
-          errorMessage = `Network error connecting to JIRA: ${error.message}`;
-      }
-    } else {
-      errorMessage = `Network error connecting to JIRA: ${error.message}`;
-    }
-
-    core.error(errorMessage);
-    throw new Error(errorMessage);
-  }
-}
-
-async function getExistingAutolinks(
-  octokit: ReturnType<typeof github.getOctokit>,
-  owner: string,
-  repo: string
-): Promise<RestEndpointMethodTypes["repos"]["listAutolinks"]["response"]["data"]> {
-  try {
-    const response = await octokit.rest.repos.listAutolinks({
-      owner,
-      repo
-    });
-    return response.data;
-  } catch (error: any) {
-    core.error(`Failed to fetch existing autolinks: ${error.message}`);
-    throw error;
-  }
-}
-
-async function createAutolink(
-  octokit: ReturnType<typeof github.getOctokit>,
-  owner: string,
-  repo: string,
-  keyPrefix: string,
-  urlTemplate: string
-): Promise<GithubAutolink> {
-  try {
-    const response = await octokit.rest.repos.createAutolink({
-      owner,
-      repo,
-      key_prefix: keyPrefix,
-      url_template: urlTemplate,
-      is_alphanumeric: true
-    });
-    core.info(`Created autolink for ${keyPrefix}: ${urlTemplate}`);
-    return response.data;
-  } catch (error: any) {
-    core.error(`Failed to create autolink for ${keyPrefix}: ${error.message}`);
-    throw error;
-  }
-}
-
-async function deleteAutolink(
-  octokit: ReturnType<typeof github.getOctokit>,
-  owner: string,
-  repo: string,
-  autolinkId: number
-): Promise<void> {
-  try {
-    await octokit.rest.repos.deleteAutolink({
-      owner,
-      repo,
-      autolink_id: autolinkId
-    });
-    core.info(`Deleted autolink with ID: ${autolinkId}`);
-  } catch (error: any) {
-    core.error(`Failed to delete autolink ${autolinkId}: ${error.message}`);
-    throw error;
-  }
-}
-
-async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
+export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
   try {
     const {
       core: coreLib = core,
@@ -207,8 +17,9 @@ async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
     const jiraUrl = coreLib.getInput('jira-url', { required: true });
     const jiraUsername = coreLib.getInput('jira-username', { required: true });
     const jiraApiToken = coreLib.getInput('jira-api-token', { required: true });
-    let currentRepo = githubLib.context.repo.owner + '/' + githubLib.context.repo.repo;
-    const repository = coreLib.getInput('repository') || currentRepo;
+    let currentRepo = githubLib.context.repo;
+    let currentRepoStr = currentRepo.owner + '/' + currentRepo.repo;
+    const repository = coreLib.getInput('repository') || currentRepoStr;
 
     const [owner, repo] = repository.split('/');
     const octokit = githubLib.getOctokit(githubToken);
@@ -285,4 +96,5 @@ if (require.main === module) {
   syncAutolinks();
 }
 
-export { syncAutolinks, getJiraQueues, getExistingAutolinks, createAutolink, deleteAutolink };
+export { getJiraQueues } from './jira';
+export { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
