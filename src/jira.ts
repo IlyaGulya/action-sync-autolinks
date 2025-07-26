@@ -1,4 +1,3 @@
-import * as core from '@actions/core';
 import { JiraProject, JiraApiError } from './types';
 
 export function mapJiraError(error: any): string {
@@ -56,50 +55,44 @@ export async function getJiraQueues(
   apiToken: string,
   http: typeof fetch = fetch
 ): Promise<JiraProject[]> {
-  try {
-    const auth = Buffer.from(`${username}:${apiToken}`).toString('base64');
+  const auth = Buffer.from(`${username}:${apiToken}`).toString('base64');
 
-    // Get all projects (which contain queues/issues)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  // Get all projects (which contain queues/issues)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    const response = await http(`${jiraUrl}/rest/api/3/project`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      signal: controller.signal
-    });
+  const response = await http(`${jiraUrl}/rest/api/3/project`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    },
+    signal: controller.signal
+  });
 
-    clearTimeout(timeoutId);
+  clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as JiraApiError;
-      error.response = {
-        status: response.status,
-        data: errorData,
-        headers: Object.fromEntries(response.headers.entries())
-      };
-      throw error;
-    }
-
-    const data = await response.json();
-
-    if (!data || !Array.isArray(data)) {
-      throw new Error('Invalid response format from JIRA API');
-    }
-
-    return data.map((project: any) => ({
-      key: project.key,
-      name: project.name,
-      id: project.id
-    })).filter((project: JiraProject) => project.key); // Filter out projects without keys
-  } catch (error: any) {
-    const errorMessage = mapJiraError(error);
-    core.error(errorMessage);
-    throw new Error(errorMessage);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as JiraApiError;
+    error.response = {
+      status: response.status,
+      data: errorData,
+      headers: Object.fromEntries(response.headers.entries())
+    };
+    throw error;
   }
+
+  const data = await response.json();
+
+  if (!data || !Array.isArray(data)) {
+    throw new Error('Invalid response format from JIRA API');
+  }
+
+  return data.map((project: any) => ({
+    key: project.key,
+    name: project.name,
+    id: project.id
+  })).filter((project: JiraProject) => project.key); // Filter out projects without keys
 }
