@@ -1,7 +1,7 @@
-import * as core from '@actions/core';
-import * as github from '@actions/github';
+import type * as core from '@actions/core';
+import type * as github from '@actions/github';
 import type {
-  RestEndpointMethodTypes
+  RestEndpointMethodTypes,
 } from "@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
 
 export interface JiraProject {

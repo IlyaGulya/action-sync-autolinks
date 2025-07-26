@@ -7,7 +7,7 @@ on:
 jobs:
   build-dist:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -21,6 +21,9 @@ jobs:
 
     - name: Install dependencies
       run: bun install
+
+    - name: Run typecheck
+      run: bun run typecheck
 
     - name: Run tests
       run: bun test

@@ -1,6 +1,55 @@
 import * as core from '@actions/core';
 import { JiraProject, JiraApiError } from './types';
 
+export function mapJiraError(error: any): string {
+  if (error.response) {
+    const status = error.response.status;
+    const errorData = error.response.data;
+
+    switch (status) {
+      case 401:
+        let authMessage = 'JIRA authentication failed. Please check your username and API token.';
+        if (errorData?.errorMessages?.length > 0) {
+          authMessage += ` Details: ${errorData.errorMessages.join(', ')}`;
+        }
+        return authMessage;
+      case 403:
+        let accessMessage = 'Access denied to JIRA projects. Please check your permissions.';
+        if (errorData?.errorMessages?.length > 0) {
+          accessMessage += ` Details: ${errorData.errorMessages.join(', ')}`;
+        }
+        return accessMessage;
+      case 404:
+        return 'JIRA instance not found. Please check your JIRA URL.';
+      case 429:
+        const retryAfter = error.response.headers['retry-after'] || 'unknown';
+        return `JIRA API rate limit exceeded. Retry after: ${retryAfter} seconds.`;
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return `JIRA server error (${status}). Please try again later or contact your JIRA administrator.`;
+      default:
+        return `JIRA API error (${status}): ${error.message}`;
+    }
+  } else if (error.name === 'AbortError') {
+    return 'JIRA API request timed out. Please check your network connection or try again later.';
+  } else if (error.code) {
+    switch (error.code) {
+      case 'ENOTFOUND':
+        return 'Cannot resolve JIRA URL. Please check that the JIRA URL is correct and accessible.';
+      case 'ECONNREFUSED':
+        return 'Connection to JIRA refused. Please check your JIRA URL and network connectivity.';
+      case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
+        return 'SSL certificate verification failed for JIRA instance. Please check the certificate or contact your administrator.';
+      default:
+        return `Network error connecting to JIRA: ${error.message}`;
+    }
+  } else {
+    return `Network error connecting to JIRA: ${error.message}`;
+  }
+}
+
 export async function getJiraQueues(
   jiraUrl: string,
   username: string,
@@ -49,61 +98,7 @@ export async function getJiraQueues(
       id: project.id
     })).filter((project: JiraProject) => project.key); // Filter out projects without keys
   } catch (error: any) {
-    let errorMessage: string;
-
-    if (error.response) {
-      const status = error.response.status;
-      const errorData = error.response.data;
-
-      switch (status) {
-        case 401:
-          errorMessage = 'JIRA authentication failed. Please check your username and API token.';
-          if (errorData?.errorMessages?.length > 0) {
-            errorMessage += ` Details: ${errorData.errorMessages.join(', ')}`;
-          }
-          break;
-        case 403:
-          errorMessage = 'Access denied to JIRA projects. Please check your permissions.';
-          if (errorData?.errorMessages?.length > 0) {
-            errorMessage += ` Details: ${errorData.errorMessages.join(', ')}`;
-          }
-          break;
-        case 404:
-          errorMessage = 'JIRA instance not found. Please check your JIRA URL.';
-          break;
-        case 429:
-          const retryAfter = error.response.headers['retry-after'] || 'unknown';
-          errorMessage = `JIRA API rate limit exceeded. Retry after: ${retryAfter} seconds.`;
-          break;
-        case 500:
-        case 502:
-        case 503:
-        case 504:
-          errorMessage = `JIRA server error (${status}). Please try again later or contact your JIRA administrator.`;
-          break;
-        default:
-          errorMessage = `JIRA API error (${status}): ${error.message}`;
-      }
-    } else if (error.name === 'AbortError') {
-      errorMessage = 'JIRA API request timed out. Please check your network connection or try again later.';
-    } else if (error.code) {
-      switch (error.code) {
-        case 'ENOTFOUND':
-          errorMessage = 'Cannot resolve JIRA URL. Please check that the JIRA URL is correct and accessible.';
-          break;
-        case 'ECONNREFUSED':
-          errorMessage = 'Connection to JIRA refused. Please check your JIRA URL and network connectivity.';
-          break;
-        case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
-          errorMessage = 'SSL certificate verification failed for JIRA instance. Please check the certificate or contact your administrator.';
-          break;
-        default:
-          errorMessage = `Network error connecting to JIRA: ${error.message}`;
-      }
-    } else {
-      errorMessage = `Network error connecting to JIRA: ${error.message}`;
-    }
-
+    const errorMessage = mapJiraError(error);
     core.error(errorMessage);
     throw new Error(errorMessage);
   }

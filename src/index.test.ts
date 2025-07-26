@@ -141,32 +141,34 @@ describe('syncAutolinks', () => {
     );
   });
 
-  test('deletes only obsolete JIRA-looking autolinks', async () => {
+  test('no projects still prunes obsolete JIRA autolinks and outputs 0', async () => {
     http.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve([]),
       headers: new Map()
-    }); // No JIRA projects
-
+    });
     fakeOctokit.rest.repos.listAutolinks.mockResolvedValueOnce({
       data: [
         { id: 1, key_prefix: 'JIRA-', url_template: 'https://example.atlassian.net/browse/JIRA-<num>' },
         { id: 2, key_prefix: 'TICKET-', url_template: 'https://example.atlassian.net/browse/TICKET-<num>' },
         { id: 3, key_prefix: 'NONJ-', url_template: 'https://other.com/browse/NONJ-<num>' },
-        { id: 4, key_prefix: 'OTHER', url_template: 'https://example.atlassian.net/browse/OTHER-<num>' }
+        { id: 4, key_prefix: 'OTHER', url_template: 'https://example.atlassian.net/browse/OTHER-<num>' },
+        { id: 5, key_prefix: 'AAA-', url_template: `${jiraUrl}/browse/AAA-<num>` }
       ]
     });
-
     fakeOctokit.rest.repos.deleteAutolink.mockResolvedValue({});
-
+    
     await syncAutolinks({ core: mockCore, githubLib, http });
-
+    
     // Should delete JIRA- and TICKET- (ends with - and contains jiraUrl)
     expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
       owner: 'org', repo: 'repo', autolink_id: 1
     });
     expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
       owner: 'org', repo: 'repo', autolink_id: 2
+    });
+    expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
+      owner: 'org', repo: 'repo', autolink_id: 5
     });
 
     // Should NOT delete NONJ- (different URL) or OTHER (doesn't end with -)
@@ -176,21 +178,7 @@ describe('syncAutolinks', () => {
     expect(fakeOctokit.rest.repos.deleteAutolink).not.toHaveBeenCalledWith({
       owner: 'org', repo: 'repo', autolink_id: 4
     });
-  });
-
-  test('no projects still prunes obsolete JIRA autolinks and outputs 0', async () => {
-    http.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve([]),
-      headers: new Map()
-    });
-    fakeOctokit.rest.repos.listAutolinks.mockResolvedValueOnce({
-      data: [{ id: 1, key_prefix: 'AAA-', url_template: `${jiraUrl}/browse/AAA-<num>` }]
-    });
-    await syncAutolinks({ core: mockCore, githubLib, http });
-    expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
-      owner: 'org', repo: 'repo', autolink_id: 1
-    });
+    
     expect(mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 0);
   });
 

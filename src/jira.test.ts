@@ -1,9 +1,87 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test';
-import { getJiraQueues } from './jira';
+import { getJiraQueues, mapJiraError } from './jira';
 
 const jiraUrl = 'https://example.atlassian.net';
 const username = 'u';
 const token = 't';
+
+describe('mapJiraError', () => {
+  test.each([
+    // HTTP response errors
+    [
+      { response: { status: 401, data: { errorMessages: ['Bad token'] }, headers: {} }, message: 'HTTP 401' },
+      'JIRA authentication failed. Please check your username and API token. Details: Bad token'
+    ],
+    [
+      { response: { status: 401, data: {}, headers: {} }, message: 'HTTP 401' },
+      'JIRA authentication failed. Please check your username and API token.'
+    ],
+    [
+      { response: { status: 403, data: { errorMessages: ['Forbidden'] }, headers: {} }, message: 'HTTP 403' },
+      'Access denied to JIRA projects. Please check your permissions. Details: Forbidden'
+    ],
+    [
+      { response: { status: 404, data: {}, headers: {} }, message: 'HTTP 404' },
+      'JIRA instance not found. Please check your JIRA URL.'
+    ],
+    [
+      { response: { status: 429, data: {}, headers: { 'retry-after': '42' } }, message: 'HTTP 429' },
+      'JIRA API rate limit exceeded. Retry after: 42 seconds.'
+    ],
+    [
+      { response: { status: 429, data: {}, headers: {} }, message: 'HTTP 429' },
+      'JIRA API rate limit exceeded. Retry after: unknown seconds.'
+    ],
+    [
+      { response: { status: 500, data: {}, headers: {} }, message: 'HTTP 500' },
+      'JIRA server error (500). Please try again later or contact your JIRA administrator.'
+    ],
+    [
+      { response: { status: 502, data: {}, headers: {} }, message: 'HTTP 502' },
+      'JIRA server error (502). Please try again later or contact your JIRA administrator.'
+    ],
+    [
+      { response: { status: 503, data: {}, headers: {} }, message: 'HTTP 503' },
+      'JIRA server error (503). Please try again later or contact your JIRA administrator.'
+    ],
+    [
+      { response: { status: 504, data: {}, headers: {} }, message: 'HTTP 504' },
+      'JIRA server error (504). Please try again later or contact your JIRA administrator.'
+    ],
+    [
+      { response: { status: 418, data: {}, headers: {} }, message: 'HTTP 418: Teapot' },
+      'JIRA API error (418): HTTP 418: Teapot'
+    ],
+    // Network errors
+    [
+      { name: 'AbortError', message: 'timeout' },
+      'JIRA API request timed out. Please check your network connection or try again later.'
+    ],
+    [
+      { code: 'ENOTFOUND', message: 'host not found' },
+      'Cannot resolve JIRA URL. Please check that the JIRA URL is correct and accessible.'
+    ],
+    [
+      { code: 'ECONNREFUSED', message: 'connection refused' },
+      'Connection to JIRA refused. Please check your JIRA URL and network connectivity.'
+    ],
+    [
+      { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', message: 'ssl error' },
+      'SSL certificate verification failed for JIRA instance. Please check the certificate or contact your administrator.'
+    ],
+    [
+      { code: 'UNKNOWN_CODE', message: 'weird failure' },
+      'Network error connecting to JIRA: weird failure'
+    ],
+    // Generic errors
+    [
+      { message: 'weird failure' },
+      'Network error connecting to JIRA: weird failure'
+    ]
+  ])('maps error correctly: %s', (error, expected) => {
+    expect(mapJiraError(error)).toBe(expected);
+  });
+});
 
 describe('getJiraQueues', () => {
   let http: any;
@@ -51,131 +129,4 @@ describe('getJiraQueues', () => {
       .rejects.toThrow('Invalid response format');
   });
 
-  test('HTTP status mapping (401)', async () => {
-    http.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      statusText: 'Unauthorized',
-      json: () => Promise.resolve({ errorMessages: ['Invalid credentials'] }),
-      headers: new Map()
-    });
-    await expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('JIRA authentication failed');
-  });
-
-  test('401 appends errorMessages details', async () => {
-    http.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      statusText: 'Unauthorized',
-      json: () => Promise.resolve({ errorMessages: ['Bad token', 'Another msg'] }),
-      headers: new Map()
-    });
-    await expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('Bad token, Another msg');
-  });
-
-  test('HTTP status mapping (403)', async () => {
-    http.mockResolvedValueOnce({
-      ok: false,
-      status: 403,
-      statusText: 'Forbidden',
-      json: () => Promise.resolve({ errorMessages: ['Forbidden'] }),
-      headers: new Map()
-    });
-    await expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('Access denied to JIRA projects');
-  });
-
-  test('HTTP status mapping (404)', async () => {
-    http.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-      json: () => Promise.resolve({}),
-      headers: new Map()
-    });
-    expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('JIRA instance not found');
-  });
-
-  test('HTTP status mapping (429 w/ retry header)', async () => {
-    const headers = new Map();
-    headers.set('retry-after', '42');
-    http.mockResolvedValueOnce({
-      ok: false,
-      status: 429,
-      statusText: 'Too Many Requests',
-      json: () => Promise.resolve({}),
-      headers
-    });
-    expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('rate limit exceeded. Retry after: 42 seconds');
-  });
-
-  test('HTTP 429 without retry-after uses "unknown"', async () => {
-    http.mockResolvedValueOnce({
-      ok: false,
-      status: 429,
-      statusText: 'Too Many Requests',
-      json: () => Promise.resolve({}),
-      headers: new Map()
-    });
-    expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('Retry after: unknown seconds');
-  });
-
-  test('HTTP status mapping (500)', async () => {
-    http.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      json: () => Promise.resolve({}),
-      headers: new Map()
-    });
-    expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('JIRA server error (500)');
-  });
-
-  test.each([502, 503, 504])('HTTP status mapping (%i)', async (status: number) => {
-    http.mockResolvedValueOnce({
-      ok: false,
-      status,
-      statusText: `Server Error ${status}`,
-      json: () => Promise.resolve({}),
-      headers: new Map()
-    });
-    expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow(`JIRA server error (${status})`);
-  });
-
-  test('Network error mapping (AbortError)', async () => {
-    http.mockRejectedValueOnce({ name: 'AbortError', message: 'timeout' });
-    expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('request timed out');
-  });
-
-  test('Network error mapping (ENOTFOUND)', async () => {
-    http.mockRejectedValueOnce({ code: 'ENOTFOUND', message: 'host not found' });
-    expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('Cannot resolve JIRA URL');
-  });
-
-  test('Network error mapping (ECONNREFUSED)', async () => {
-    http.mockRejectedValueOnce({ code: 'ECONNREFUSED', message: 'connection refused' });
-    expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('Connection to JIRA refused');
-  });
-
-  test('Network error mapping (SSL)', async () => {
-    http.mockRejectedValueOnce({ code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', message: 'ssl error' });
-    await expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('SSL certificate verification failed');
-  });
-
-  test('Unknown error shape falls back to generic message', async () => {
-    http.mockRejectedValueOnce({ message: 'weird failure' }); // no response/code
-    await expect(getJiraQueues(jiraUrl, username, token, http))
-      .rejects.toThrow('Network error connecting to JIRA');
-  });
 });
