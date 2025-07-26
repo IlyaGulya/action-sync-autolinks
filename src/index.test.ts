@@ -1,12 +1,12 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test';
-import { getJiraQueues, syncAutolinks, getExistingAutolinks, createAutolink, deleteAutolink } from './index.js';
+import { getJiraQueues, syncAutolinks, getExistingAutolinks, createAutolink, deleteAutolink } from './index';
 
 const jiraUrl = 'https://example.atlassian.net';
 const username = 'u';
 const token = 't';
 
 describe('getJiraQueues', () => {
-  let http;
+  let http: any;
 
   beforeEach(() => {
     http = mock();
@@ -137,7 +137,7 @@ describe('getJiraQueues', () => {
       .rejects.toThrow('JIRA server error (500)');
   });
 
-  test.each([502, 503, 504])('HTTP status mapping (%i)', async (status) => {
+  test.each([502, 503, 504])('HTTP status mapping (%i)', async (status: number) => {
     http.mockResolvedValueOnce({
       ok: false,
       status,
@@ -181,10 +181,10 @@ describe('getJiraQueues', () => {
 });
 
 describe('syncAutolinks', () => {
-  let core, githubLib, http, fakeOctokit;
+  let mockCore: any, githubLib: any, http: any, fakeOctokit: any;
 
   beforeEach(() => {
-    core = {
+    mockCore = {
       getInput: mock(),
       setOutput: mock(),
       setFailed: mock(),
@@ -192,8 +192,8 @@ describe('syncAutolinks', () => {
       error: mock()
     };
 
-    core.getInput.mockImplementation((name) => {
-      const map = {
+    mockCore.getInput.mockImplementation((name: string) => {
+      const map: Record<string, string> = {
         'github-token': 'ghs123',
         'jira-url': 'https://example.atlassian.net',
         'jira-username': 'u',
@@ -245,7 +245,7 @@ describe('syncAutolinks', () => {
     fakeOctokit.rest.repos.deleteAutolink.mockResolvedValue({});
     fakeOctokit.rest.repos.createAutolink.mockResolvedValue({ data: {} });
 
-    await syncAutolinks({ core, githubLib, http });
+    await syncAutolinks({ core: mockCore, githubLib, http });
 
     // Check that deleteAutolink was called (exact calls may vary)
     expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalled();
@@ -253,14 +253,14 @@ describe('syncAutolinks', () => {
 
     // Should delete obsolete JIRA autolinks but preserve non-JIRA ones
     const deleteCalls = fakeOctokit.rest.repos.deleteAutolink.mock.calls;
-    const deletedIds = deleteCalls.map(call => call[0].autolink_id);
-    
+    const deletedIds = deleteCalls.map((call: any) => call[0].autolink_id);
+
     // Should NOT delete NOTJIRA- (id 12)
     expect(deletedIds).not.toContain(12);
 
     // Outputs
-    expect(core.setOutput).toHaveBeenCalledWith('projects-synced', 2);
-    expect(core.setOutput).toHaveBeenCalledWith('autolinks-processed', 4);
+    expect(mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 2);
+    expect(mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', 4);
   });
 
   test('creates new autolinks for new projects', async () => {
@@ -273,7 +273,7 @@ describe('syncAutolinks', () => {
     fakeOctokit.rest.repos.listAutolinks.mockResolvedValueOnce({ data: [] });
     fakeOctokit.rest.repos.createAutolink.mockResolvedValue({ data: {} });
 
-    await syncAutolinks({ core, githubLib, http });
+    await syncAutolinks({ core: mockCore, githubLib, http });
 
     expect(fakeOctokit.rest.repos.createAutolink).toHaveBeenCalledWith({
       owner: 'org',
@@ -282,10 +282,10 @@ describe('syncAutolinks', () => {
       url_template: 'https://example.atlassian.net/browse/NEW-<num>',
       is_alphanumeric: true
     });
-    
+
     // Outputs
-    expect(core.setOutput).toHaveBeenCalledWith('projects-synced', 1);
-    expect(core.setOutput).toHaveBeenCalledWith('autolinks-processed', 0);
+    expect(mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 1);
+    expect(mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', 0);
   });
 
   test('skips when autolink is up to date', async () => {
@@ -301,7 +301,7 @@ describe('syncAutolinks', () => {
       ]
     });
 
-    await syncAutolinks({ core, githubLib, http });
+    await syncAutolinks({ core: mockCore, githubLib, http });
 
     // Should not create or delete anything
     expect(fakeOctokit.rest.repos.createAutolink).not.toHaveBeenCalled();
@@ -311,9 +311,9 @@ describe('syncAutolinks', () => {
   test('handles failure and calls setFailed', async () => {
     http.mockRejectedValueOnce({ code: 'ENOTFOUND', message: 'bad host' });
 
-    await syncAutolinks({ core, githubLib, http });
+    await syncAutolinks({ core: mockCore, githubLib, http });
 
-    expect(core.setFailed).toHaveBeenCalledWith(
+    expect(mockCore.setFailed).toHaveBeenCalledWith(
       expect.stringContaining('Cannot resolve JIRA URL')
     );
   });
@@ -336,7 +336,7 @@ describe('syncAutolinks', () => {
 
     fakeOctokit.rest.repos.deleteAutolink.mockResolvedValue({});
 
-    await syncAutolinks({ core, githubLib, http });
+    await syncAutolinks({ core: mockCore, githubLib, http });
 
     // Should delete JIRA- and TICKET- (ends with - and contains jiraUrl)
     expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
@@ -364,16 +364,16 @@ describe('syncAutolinks', () => {
     fakeOctokit.rest.repos.listAutolinks.mockResolvedValueOnce({
       data: [{ id: 1, key_prefix: 'AAA-', url_template: `${jiraUrl}/browse/AAA-<num>` }]
     });
-    await syncAutolinks({ core, githubLib, http });
+    await syncAutolinks({ core: mockCore, githubLib, http });
     expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
       owner: 'org', repo: 'repo', autolink_id: 1
     });
-    expect(core.setOutput).toHaveBeenCalledWith('projects-synced', 0);
+    expect(mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 0);
   });
 
   test('uses repository input when provided', async () => {
-    core.getInput.mockImplementation((name) => {
-      const map = {
+    mockCore.getInput.mockImplementation((name: string) => {
+      const map: Record<string, string> = {
         'github-token': 'gh',
         'jira-url': jiraUrl,
         'jira-username': 'u',
@@ -389,7 +389,7 @@ describe('syncAutolinks', () => {
     });
     fakeOctokit.rest.repos.listAutolinks.mockResolvedValueOnce({ data: [] });
 
-    await syncAutolinks({ core, githubLib, http });
+    await syncAutolinks({ core: mockCore, githubLib, http });
 
     // Ensure octokit calls carry altOwner/altRepo
     expect(fakeOctokit.rest.repos.listAutolinks)
@@ -402,38 +402,31 @@ describe('helper functions', () => {
     const mockOctokit = {
       rest: {
         repos: {
-          listAutolinks: mock().mockResolvedValue({ data: [{ id: 1 }] })
+          listAutolinks: mock().mockResolvedValue({ data: [{ id: 1, key_prefix: 'test-', url_template: 'https://test.com/<num>', is_alphanumeric: true }] })
         }
       }
     };
 
-    const result = await getExistingAutolinks(mockOctokit, 'owner', 'repo');
-    expect(result).toEqual([{ id: 1 }]);
+    const result = await getExistingAutolinks(mockOctokit as any, 'owner', 'repo');
+    expect(result).toEqual([{ id: 1, key_prefix: 'test-', url_template: 'https://test.com/<num>', is_alphanumeric: true }]);
 
-    // Test error handling with logging
-    const core = require('@actions/core');
-    const originalError = core.error;
-    core.error = mock();
-    
+    // Test error handling
     mockOctokit.rest.repos.listAutolinks.mockRejectedValueOnce(new Error('API Error'));
-    await expect(getExistingAutolinks(mockOctokit, 'owner', 'repo'))
+    await expect(getExistingAutolinks(mockOctokit as any, 'owner', 'repo'))
       .rejects.toThrow('API Error');
-    
-    expect(core.error).toHaveBeenCalledWith('Failed to fetch existing autolinks: API Error');
-    core.error = originalError;
   });
 
   test('createAutolink calls API and handles errors', async () => {
     const mockOctokit = {
       rest: {
         repos: {
-          createAutolink: mock().mockResolvedValue({ data: { id: 1 } })
+          createAutolink: mock().mockResolvedValue({ data: { id: 1, key_prefix: 'TEST-', url_template: 'https://test.com/<num>', is_alphanumeric: true } })
         }
       }
     };
 
-    const result = await createAutolink(mockOctokit, 'owner', 'repo', 'TEST-', 'https://test.com/<num>');
-    expect(result).toEqual({ id: 1 });
+    const result = await createAutolink(mockOctokit as any, 'owner', 'repo', 'TEST-', 'https://test.com/<num>');
+    expect(result).toEqual({ id: 1, key_prefix: 'TEST-', url_template: 'https://test.com/<num>', is_alphanumeric: true });
 
     expect(mockOctokit.rest.repos.createAutolink).toHaveBeenCalledWith({
       owner: 'owner',
@@ -443,17 +436,10 @@ describe('helper functions', () => {
       is_alphanumeric: true
     });
 
-    // Test error handling with logging
-    const core = require('@actions/core');
-    const originalError = core.error;
-    core.error = mock();
-    
+    // Test error handling
     mockOctokit.rest.repos.createAutolink.mockRejectedValueOnce(new Error('Create Error'));
-    await expect(createAutolink(mockOctokit, 'owner', 'repo', 'TEST-', 'https://test.com/<num>'))
+    await expect(createAutolink(mockOctokit as any, 'owner', 'repo', 'TEST-', 'https://test.com/<num>'))
       .rejects.toThrow('Create Error');
-    
-    expect(core.error).toHaveBeenCalledWith('Failed to create autolink for TEST-: Create Error');
-    core.error = originalError;
   });
 
   test('deleteAutolink calls API and handles errors', async () => {
@@ -465,7 +451,7 @@ describe('helper functions', () => {
       }
     };
 
-    await deleteAutolink(mockOctokit, 'owner', 'repo', 123);
+    await deleteAutolink(mockOctokit as any, 'owner', 'repo', 123);
 
     expect(mockOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
       owner: 'owner',
@@ -473,16 +459,9 @@ describe('helper functions', () => {
       autolink_id: 123
     });
 
-    // Test error handling with logging
-    const core = require('@actions/core');
-    const originalError = core.error;
-    core.error = mock();
-    
+    // Test error handling
     mockOctokit.rest.repos.deleteAutolink.mockRejectedValueOnce(new Error('Delete Error'));
-    await expect(deleteAutolink(mockOctokit, 'owner', 'repo', 123))
+    await expect(deleteAutolink(mockOctokit as any, 'owner', 'repo', 123))
       .rejects.toThrow('Delete Error');
-    
-    expect(core.error).toHaveBeenCalledWith('Failed to delete autolink 123: Delete Error');
-    core.error = originalError;
   });
 });

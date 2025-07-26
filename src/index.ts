@@ -1,7 +1,38 @@
-const core = require('@actions/core');
-const github = require('@actions/github');
+import * as core from '@actions/core';
+import * as github from '@actions/github';
+import type {
+  RestEndpointMethodTypes
+} from "@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
 
-async function getJiraQueues(jiraUrl, username, apiToken, http = fetch) {
+interface JiraProject {
+  key: string;
+  name: string;
+  id: string;
+}
+
+interface JiraApiError extends Error {
+  response?: {
+    status: number;
+    data: any;
+    headers: Record<string, string>;
+  };
+  code?: string;
+}
+
+type GithubAutolink = RestEndpointMethodTypes["repos"]["getAutolink"]["response"]["data"]
+
+interface SyncDependencies {
+  core?: typeof core;
+  githubLib?: typeof github;
+  http?: typeof fetch;
+}
+
+async function getJiraQueues(
+  jiraUrl: string,
+  username: string,
+  apiToken: string,
+  http: typeof fetch = fetch
+): Promise<JiraProject[]> {
   try {
     const auth = Buffer.from(`${username}:${apiToken}`).toString('base64');
 
@@ -23,7 +54,7 @@ async function getJiraQueues(jiraUrl, username, apiToken, http = fetch) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as JiraApiError;
       error.response = {
         status: response.status,
         data: errorData,
@@ -38,18 +69,18 @@ async function getJiraQueues(jiraUrl, username, apiToken, http = fetch) {
       throw new Error('Invalid response format from JIRA API');
     }
 
-    return data.map(project => ({
+    return data.map((project: any) => ({
       key: project.key,
       name: project.name,
       id: project.id
-    })).filter(project => project.key); // Filter out projects without keys
-  } catch (error) {
-    let errorMessage = `Failed to fetch JIRA projects: ${error.message}`;
-    
+    })).filter((project: JiraProject) => project.key); // Filter out projects without keys
+  } catch (error: any) {
+    let errorMessage: string;
+
     if (error.response) {
       const status = error.response.status;
       const errorData = error.response.data;
-      
+
       switch (status) {
         case 401:
           errorMessage = 'JIRA authentication failed. Please check your username and API token.';
@@ -98,26 +129,36 @@ async function getJiraQueues(jiraUrl, username, apiToken, http = fetch) {
     } else {
       errorMessage = `Network error connecting to JIRA: ${error.message}`;
     }
-    
+
     core.error(errorMessage);
     throw new Error(errorMessage);
   }
 }
 
-async function getExistingAutolinks(octokit, owner, repo) {
+async function getExistingAutolinks(
+  octokit: ReturnType<typeof github.getOctokit>,
+  owner: string,
+  repo: string
+): Promise<RestEndpointMethodTypes["repos"]["listAutolinks"]["response"]["data"]> {
   try {
     const response = await octokit.rest.repos.listAutolinks({
       owner,
       repo
     });
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     core.error(`Failed to fetch existing autolinks: ${error.message}`);
     throw error;
   }
 }
 
-async function createAutolink(octokit, owner, repo, keyPrefix, urlTemplate) {
+async function createAutolink(
+  octokit: ReturnType<typeof github.getOctokit>,
+  owner: string,
+  repo: string,
+  keyPrefix: string,
+  urlTemplate: string
+): Promise<GithubAutolink> {
   try {
     const response = await octokit.rest.repos.createAutolink({
       owner,
@@ -128,13 +169,18 @@ async function createAutolink(octokit, owner, repo, keyPrefix, urlTemplate) {
     });
     core.info(`Created autolink for ${keyPrefix}: ${urlTemplate}`);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
     core.error(`Failed to create autolink for ${keyPrefix}: ${error.message}`);
     throw error;
   }
 }
 
-async function deleteAutolink(octokit, owner, repo, autolinkId) {
+async function deleteAutolink(
+  octokit: ReturnType<typeof github.getOctokit>,
+  owner: string,
+  repo: string,
+  autolinkId: number
+): Promise<void> {
   try {
     await octokit.rest.repos.deleteAutolink({
       owner,
@@ -142,13 +188,13 @@ async function deleteAutolink(octokit, owner, repo, autolinkId) {
       autolink_id: autolinkId
     });
     core.info(`Deleted autolink with ID: ${autolinkId}`);
-  } catch (error) {
+  } catch (error: any) {
     core.error(`Failed to delete autolink ${autolinkId}: ${error.message}`);
     throw error;
   }
 }
 
-async function syncAutolinks(deps = {}) {
+async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
   try {
     const {
       core: coreLib = core,
@@ -181,13 +227,13 @@ async function syncAutolinks(deps = {}) {
     coreLib.info(`Found ${existingAutolinks.length} existing autolinks`);
 
     // Create a map of existing autolinks by key prefix
-    const existingAutolinkMap = new Map();
+    const existingAutolinkMap = new Map<string, GithubAutolink>();
     existingAutolinks.forEach(autolink => {
       existingAutolinkMap.set(autolink.key_prefix, autolink);
     });
 
     // Track which autolinks should exist
-    const desiredPrefixes = new Set();
+    const desiredPrefixes = new Set<string>();
 
     // Create autolinks for each JIRA project
     for (const project of jiraProjects) {
@@ -197,7 +243,7 @@ async function syncAutolinks(deps = {}) {
       desiredPrefixes.add(keyPrefix);
 
       if (existingAutolinkMap.has(keyPrefix)) {
-        const existing = existingAutolinkMap.get(keyPrefix);
+        const existing = existingAutolinkMap.get(keyPrefix)!;
         if (existing.url_template === urlTemplate) {
           coreLib.info(`Autolink for ${keyPrefix} already exists and is up to date`);
         } else {
@@ -228,7 +274,7 @@ async function syncAutolinks(deps = {}) {
     coreLib.setOutput('projects-synced', jiraProjects.length);
     coreLib.setOutput('autolinks-processed', existingAutolinks.length);
 
-  } catch (error) {
+  } catch (error: any) {
     const { core: coreLib = core } = deps;
     coreLib.setFailed(`Action failed: ${error.message}`);
   }
@@ -239,4 +285,4 @@ if (require.main === module) {
   syncAutolinks();
 }
 
-module.exports = { syncAutolinks, getJiraQueues, getExistingAutolinks, createAutolink, deleteAutolink };
+export { syncAutolinks, getJiraQueues, getExistingAutolinks, createAutolink, deleteAutolink };
