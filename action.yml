@@ -20,6 +20,16 @@ inputs:
     description: 'Repository in format owner/repo'
     required: false
     default: ${{ github.repository }}
+  dry-run:
+    description: 'Run in dry-run mode (plan only, no changes)'
+    required: false
+    default: 'false'
+
+outputs:
+  projects-synced:
+    description: 'Number of JIRA projects processed'
+  autolinks-processed:
+    description: 'Number of autolink operations performed (create/update/delete)'
 
 runs:
   using: 'node20'

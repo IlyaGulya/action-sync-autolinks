@@ -1,4 +1,5 @@
 import { JiraProject, JiraApiError } from './types';
+import { withRetry } from './retry';
 
 export function mapJiraError(error: any): string {
   if (error.response) {
@@ -52,8 +53,7 @@ export function mapJiraError(error: any): string {
 export async function getJiraQueues(
   jiraUrl: string,
   username: string,
-  apiToken: string,
-  http: typeof fetch = fetch
+  apiToken: string
 ): Promise<JiraProject[]> {
   const auth = Buffer.from(`${username}:${apiToken}`).toString('base64');
 
@@ -61,15 +61,17 @@ export async function getJiraQueues(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-  const response = await http(`${jiraUrl}/rest/api/3/project`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Basic ${auth}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    },
-    signal: controller.signal
-  });
+  const response = await withRetry(() => 
+    fetch(`${jiraUrl}/rest/api/3/project`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      signal: controller.signal
+    })
+  );
 
   clearTimeout(timeoutId);
 

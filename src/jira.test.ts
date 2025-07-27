@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { describe, test, expect, spyOn, beforeEach, afterEach } from 'bun:test';
 import { getJiraQueues, mapJiraError } from './jira';
 
 const jiraUrl = 'https://example.atlassian.net';
@@ -84,14 +84,18 @@ describe('mapJiraError', () => {
 });
 
 describe('getJiraQueues', () => {
-  let http: any;
+  let fetchSpy: any;
 
   beforeEach(() => {
-    http = mock();
+    fetchSpy = spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
   });
 
   test('happy path maps and filters projects', async () => {
-    http.mockResolvedValueOnce({
+    fetchSpy.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve([
         { key: 'AAA', name: 'Proj A', id: '1' },
@@ -101,13 +105,13 @@ describe('getJiraQueues', () => {
       headers: new Map()
     });
 
-    const res = await getJiraQueues(jiraUrl, username, token, http);
+    const res = await getJiraQueues(jiraUrl, username, token);
     expect(res).toEqual([
       { key: 'AAA', name: 'Proj A', id: '1' },
       { key: 'BBB', name: 'Proj B', id: '3' }
     ]);
 
-    expect(http).toHaveBeenCalledWith(
+    expect(fetchSpy).toHaveBeenCalledWith(
       `${jiraUrl}/rest/api/3/project`,
       expect.objectContaining({
         method: 'GET',
@@ -120,13 +124,26 @@ describe('getJiraQueues', () => {
   });
 
   test('invalid response format throws', async () => {
-    http.mockResolvedValueOnce({
+    fetchSpy.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ foo: 'bar' }),
       headers: new Map()
     });
-    await expect(getJiraQueues(jiraUrl, username, token, http))
+    expect(getJiraQueues(jiraUrl, username, token))
       .rejects.toThrow('Invalid response format');
+  });
+
+  test('mapJiraError when response.json throws', async () => {
+    const badResp = {
+      ok: false,
+      status: 500,
+      statusText: 'Server Error',
+      json: () => Promise.reject(new Error('parse fail')),
+      headers: { entries: () => [].values() }
+    };
+    fetchSpy.mockResolvedValueOnce(badResp);
+    expect(getJiraQueues(jiraUrl, username, token))
+      .rejects.toThrow('HTTP 500: Server Error');
   });
 
 });

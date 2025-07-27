@@ -1,15 +1,16 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { SyncDependencies, GithubAutolink } from './types';
+import { SyncDependencies } from './types';
 import { getJiraQueues } from './jira';
-import { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
+import { getExistingAutolinks } from './github';
+import { buildAutolinkPlan } from './plan';
+import { applyAutolinkPlan, applyAutolinkPlanDryRun } from './apply';
 
 export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
   try {
     const {
       core: coreLib = core,
-      githubLib = github,
-      http = fetch
+      githubLib = github
     } = deps;
 
     // Get inputs
@@ -29,61 +30,30 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
 
     // Fetch JIRA queues/projects
     coreLib.info('Fetching JIRA projects...');
-    const jiraProjects = await getJiraQueues(jiraUrl, jiraUsername, jiraApiToken, http);
+    const jiraProjects = await getJiraQueues(jiraUrl, jiraUsername, jiraApiToken);
     coreLib.info(`Found ${jiraProjects.length} JIRA projects`);
 
     // Fetch existing autolinks
     coreLib.info('Fetching existing autolinks...');
-    const existingAutolinks = await getExistingAutolinks(octokit, owner, repo);
+    const existingAutolinks = await getExistingAutolinks(octokit, owner, repo, coreLib);
     coreLib.info(`Found ${existingAutolinks.length} existing autolinks`);
 
-    // Create a map of existing autolinks by key prefix
-    const existingAutolinkMap = new Map<string, GithubAutolink>();
-    existingAutolinks.forEach(autolink => {
-      existingAutolinkMap.set(autolink.key_prefix, autolink);
-    });
+    // Build execution plan
+    coreLib.info('Planning autolink operations...');
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    coreLib.info(`Planned ${plan.operations.length} operations for ${plan.metrics.projectsSynced} projects`);
 
-    // Track which autolinks should exist
-    const desiredPrefixes = new Set<string>();
-
-    // Create autolinks for each JIRA project
-    for (const project of jiraProjects) {
-      const keyPrefix = `${project.key}-`;
-      const urlTemplate = `${jiraUrl}/browse/${project.key}-<num>`;
-
-      desiredPrefixes.add(keyPrefix);
-
-      if (existingAutolinkMap.has(keyPrefix)) {
-        const existing = existingAutolinkMap.get(keyPrefix)!;
-        if (existing.url_template === urlTemplate) {
-          coreLib.info(`Autolink for ${keyPrefix} already exists and is up to date`);
-        } else {
-          coreLib.info(`Updating autolink for ${keyPrefix}`);
-          await deleteAutolink(octokit, owner, repo, existing.id);
-          await createAutolink(octokit, owner, repo, keyPrefix, urlTemplate);
-        }
-      } else {
-        coreLib.info(`Creating new autolink for ${keyPrefix}`);
-        await createAutolink(octokit, owner, repo, keyPrefix, urlTemplate);
-      }
-    }
-
-    // Remove autolinks that are no longer needed (only JIRA-related ones)
-    for (const [keyPrefix, autolink] of existingAutolinkMap) {
-      if (!desiredPrefixes.has(keyPrefix)) {
-        // Only delete if it looks like a JIRA autolink (ends with -)
-        if (keyPrefix.endsWith('-') && autolink.url_template.includes(jiraUrl)) {
-          coreLib.info(`Removing obsolete autolink: ${keyPrefix}`);
-          await deleteAutolink(octokit, owner, repo, autolink.id);
-        }
-      }
-    }
+    // Check for dry-run mode and apply the plan
+    const dryRun = coreLib.getInput('dry-run')?.toLowerCase() === 'true';
+    const operationsApplied = dryRun
+      ? applyAutolinkPlanDryRun(plan.operations, coreLib)
+      : await applyAutolinkPlan(octokit, owner, repo, plan.operations, coreLib);
 
     coreLib.info('Autolink sync completed successfully');
 
     // Set outputs
-    coreLib.setOutput('projects-synced', jiraProjects.length);
-    coreLib.setOutput('autolinks-processed', existingAutolinks.length);
+    coreLib.setOutput('projects-synced', plan.metrics.projectsSynced);
+    coreLib.setOutput('autolinks-processed', operationsApplied);
 
   } catch (error: any) {
     const { core: coreLib = core } = deps;
@@ -95,9 +65,12 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
 }
 
 // Run the action
-if (require.main === module) {
+if (require.main === module || (process.env.NODE_ENV !== 'test' && process.env.GITHUB_ACTIONS)) {
   syncAutolinks();
 }
 
 export { getJiraQueues } from './jira';
 export { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
+export { buildAutolinkPlan } from './plan';
+export type { AutolinkOp } from './plan';
+export { applyAutolinkPlan, applyAutolinkPlanDryRun } from './apply';

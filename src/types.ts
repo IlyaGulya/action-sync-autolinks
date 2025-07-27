@@ -19,12 +19,11 @@ export interface JiraApiError extends Error {
   code?: string;
 }
 
-export type GithubAutolink = RestEndpointMethodTypes["repos"]["getAutolink"]["response"]["data"]
+export type GithubAutolink = RestEndpointMethodTypes["repos"]["listAutolinks"]["response"]["data"][number]
 
 export type Octokit = ReturnType<typeof github.getOctokit>;
 
 export interface SyncDependencies {
   core?: typeof core;
   githubLib?: typeof github;
-  http?: typeof fetch;
 }
