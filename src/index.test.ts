@@ -1,13 +1,14 @@
-import { describe, test, expect, mock, beforeEach, afterEach, spyOn } from 'bun:test';
+import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { mockFetch, clearFetchMocks } from '@aryzing/bun-mock-fetch';
 import { syncAutolinks } from './index';
+import { mockFetchJson } from './test-utils';
 
 const jiraUrl = 'https://example.atlassian.net';
 
 describe('syncAutolinks', () => {
-  let mockCore: any, githubLib: any, fetchSpy: any, fakeOctokit: any;
+  let mockCore: any, githubLib: any, fakeOctokit: any;
 
   beforeEach(() => {
-    fetchSpy = spyOn(global, 'fetch');
     mockCore = {
       getInput: mock(),
       setOutput: mock(),
@@ -46,19 +47,15 @@ describe('syncAutolinks', () => {
   });
 
   afterEach(() => {
-    fetchSpy.mockRestore();
+    clearFetchMocks();
   });
 
   test('creates, updates, deletes, sets outputs', async () => {
     // JIRA returns 2 projects
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve([
-        { key: 'AAA', name: 'A', id: '1' },
-        { key: 'BBB', name: 'B', id: '2' }
-      ]),
-      headers: new Map()
-    });
+    mockFetchJson('https://example.atlassian.net/rest/api/3/project', [
+      { key: 'AAA', name: 'A', id: '1' },
+      { key: 'BBB', name: 'B', id: '2' }
+    ]);
 
     // Existing: one up-to-date, one wrong template, one obsolete non-JIRA, one obsolete JIRA
     fakeOctokit.paginate.mockResolvedValueOnce([
@@ -90,11 +87,9 @@ describe('syncAutolinks', () => {
   });
 
   test('creates new autolinks for new projects', async () => {
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve([{ key: 'NEW', name: 'New Project', id: '1' }]),
-      headers: new Map()
-    });
+    mockFetchJson('https://example.atlassian.net/rest/api/3/project', [
+      { key: 'NEW', name: 'New Project', id: '1' }
+    ]);
 
     fakeOctokit.paginate.mockResolvedValueOnce([]);
     fakeOctokit.rest.repos.createAutolink.mockResolvedValue({ data: {} });
@@ -115,11 +110,9 @@ describe('syncAutolinks', () => {
   });
 
   test('skips when autolink is up to date', async () => {
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve([{ key: 'SAME', name: 'Same', id: '1' }]),
-      headers: new Map()
-    });
+    mockFetchJson('https://example.atlassian.net/rest/api/3/project', [
+      { key: 'SAME', name: 'Same', id: '1' }
+    ]);
 
     fakeOctokit.paginate.mockResolvedValueOnce([
       { id: 10, key_prefix: 'SAME-', url_template: 'https://example.atlassian.net/browse/SAME-<num>' }
@@ -133,7 +126,9 @@ describe('syncAutolinks', () => {
   });
 
   test('handles failure and calls setFailed', async () => {
-    fetchSpy.mockRejectedValueOnce({ code: 'ENOTFOUND', message: 'bad host' });
+    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+      throw { code: 'ENOTFOUND', message: 'bad host' };
+    });
 
     await syncAutolinks({ core: mockCore, githubLib });
 
@@ -143,11 +138,7 @@ describe('syncAutolinks', () => {
   });
 
   test('no projects still prunes obsolete JIRA autolinks and outputs 0', async () => {
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve([]),
-      headers: new Map()
-    });
+    mockFetchJson('https://example.atlassian.net/rest/api/3/project', []);
     fakeOctokit.paginate.mockResolvedValueOnce([
       { id: 1, key_prefix: 'JIRA-', url_template: 'https://example.atlassian.net/browse/JIRA-<num>' },
       { id: 2, key_prefix: 'TICKET-', url_template: 'https://example.atlassian.net/browse/TICKET-<num>' },
@@ -193,11 +184,7 @@ describe('syncAutolinks', () => {
       };
       return map[name];
     });
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve([]),
-      headers: new Map()
-    });
+    mockFetchJson('https://example.atlassian.net/rest/api/3/project', []);
     fakeOctokit.paginate.mockResolvedValueOnce([]);
 
     await syncAutolinks({ core: mockCore, githubLib });
@@ -220,14 +207,10 @@ describe('syncAutolinks', () => {
       return map[name];
     });
 
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve([
-        { key: 'PLAN1', name: 'Project 1', id: '1' },
-        { key: 'PLAN2', name: 'Project 2', id: '2' }
-      ]),
-      headers: new Map()
-    });
+    mockFetchJson('https://example.atlassian.net/rest/api/3/project', [
+      { key: 'PLAN1', name: 'Project 1', id: '1' },
+      { key: 'PLAN2', name: 'Project 2', id: '2' }
+    ]);
 
     fakeOctokit.paginate.mockResolvedValueOnce([
       { id: 10, key_prefix: 'OLD-', url_template: `${jiraUrl}/browse/OLD-<num>` }
@@ -258,7 +241,9 @@ describe('syncAutolinks', () => {
       message: 'teapot error'
     };
 
-    fetchSpy.mockRejectedValueOnce(jiraError);
+    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+      throw jiraError;
+    });
 
     await syncAutolinks({ core: mockCore, githubLib });
 
@@ -267,7 +252,9 @@ describe('syncAutolinks', () => {
 
   test('error handling maps JIRA timeout/AbortError', async () => {
     const abortError = Object.assign(new Error('timeout'), { name: 'AbortError' });
-    fetchSpy.mockRejectedValueOnce(abortError);
+    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+      throw abortError;
+    });
 
     await syncAutolinks({ core: mockCore, githubLib });
 
@@ -278,7 +265,9 @@ describe('syncAutolinks', () => {
 
   test('error handling maps network errors', async () => {
     const networkError = Object.assign(new Error('Connection failed'), { code: 'ENOTFOUND' });
-    fetchSpy.mockRejectedValueOnce(networkError);
+    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+      throw networkError;
+    });
 
     await syncAutolinks({ core: mockCore, githubLib });
 
@@ -289,13 +278,17 @@ describe('syncAutolinks', () => {
 
   test('withRetry integration with JIRA API', async () => {
     // First call returns 429, second call succeeds
-    fetchSpy
-      .mockRejectedValueOnce({ response: { status: 429, headers: { 'retry-after': '1' } } })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve([{ key: 'RETRY', name: 'Retry Project', id: '1' }]),
-        headers: new Map()
+    let callCount = 0;
+    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+      callCount++;
+      if (callCount === 1) {
+        throw { response: { status: 429, headers: { 'retry-after': '1' } } };
+      }
+      return new Response(JSON.stringify([{ key: 'RETRY', name: 'Retry Project', id: '1' }]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
       });
+    });
 
     fakeOctokit.paginate.mockResolvedValueOnce([]);
     fakeOctokit.rest.repos.createAutolink.mockResolvedValue({ data: {} });
@@ -303,7 +296,7 @@ describe('syncAutolinks', () => {
     await syncAutolinks({ core: mockCore, githubLib });
 
     // Should have retried and succeeded
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(callCount).toBe(2);
     expect(fakeOctokit.rest.repos.createAutolink).toHaveBeenCalledWith({
       owner: 'org',
       repo: 'repo',
@@ -314,7 +307,9 @@ describe('syncAutolinks', () => {
   });
 
   test('maps unknown error without message', async () => {
-    fetchSpy.mockRejectedValueOnce({});
+    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+      throw {};
+    });
     await syncAutolinks({ core: mockCore, githubLib });
     expect(mockCore.setFailed).toHaveBeenCalledWith('Network error connecting to JIRA: undefined');
   });

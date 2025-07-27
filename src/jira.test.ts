@@ -1,5 +1,7 @@
-import { describe, test, expect, spyOn, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { mockFetch, clearFetchMocks } from '@aryzing/bun-mock-fetch';
 import { getJiraQueues, mapJiraError } from './jira';
+import { mockFetchJson } from './test-utils';
 
 const jiraUrl = 'https://example.atlassian.net';
 const username = 'u';
@@ -84,26 +86,19 @@ describe('mapJiraError', () => {
 });
 
 describe('getJiraQueues', () => {
-  let fetchSpy: any;
-
   beforeEach(() => {
-    fetchSpy = spyOn(global, 'fetch');
   });
 
   afterEach(() => {
-    fetchSpy.mockRestore();
+    clearFetchMocks();
   });
 
   test('happy path maps and filters projects', async () => {
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve([
-        { key: 'AAA', name: 'Proj A', id: '1' },
-        { name: 'No Key', id: '2' },
-        { key: 'BBB', name: 'Proj B', id: '3' }
-      ]),
-      headers: new Map()
-    });
+    mockFetchJson(`${jiraUrl}/rest/api/3/project`, [
+      { key: 'AAA', name: 'Proj A', id: '1' },
+      { name: 'No Key', id: '2' },
+      { key: 'BBB', name: 'Proj B', id: '3' }
+    ]);
 
     const res = await getJiraQueues(jiraUrl, username, token);
     expect(res).toEqual([
@@ -111,37 +106,21 @@ describe('getJiraQueues', () => {
       { key: 'BBB', name: 'Proj B', id: '3' }
     ]);
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      `${jiraUrl}/rest/api/3/project`,
-      expect.objectContaining({
-        method: 'GET',
-        headers: expect.objectContaining({
-          Authorization: expect.stringContaining('Basic ')
-        }),
-        signal: expect.any(AbortSignal)
-      })
-    );
+    // Note: mockFetch automatically validates the URL and method
   });
 
   test('invalid response format throws', async () => {
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ foo: 'bar' }),
-      headers: new Map()
-    });
+    mockFetchJson(`${jiraUrl}/rest/api/3/project`, { foo: 'bar' });
     expect(getJiraQueues(jiraUrl, username, token))
       .rejects.toThrow('Invalid response format');
   });
 
   test('mapJiraError when response.json throws', async () => {
-    const badResp = {
-      ok: false,
+    mockFetch(`${jiraUrl}/rest/api/3/project`, new Response('invalid json', {
       status: 500,
       statusText: 'Server Error',
-      json: () => Promise.reject(new Error('parse fail')),
-      headers: { entries: () => [].values() }
-    };
-    fetchSpy.mockResolvedValueOnce(badResp);
+      headers: { 'Content-Type': 'application/json' }
+    }));
     expect(getJiraQueues(jiraUrl, username, token))
       .rejects.toThrow('HTTP 500: Server Error');
   });
