@@ -3,7 +3,6 @@ import { mockFetch } from '@aryzing/bun-mock-fetch';
 import { syncAutolinks } from './index';
 import { useTestEnv } from './test-support/use-test-env';
 import { mockFetchJson } from './test-support/fetch';
-import { expectSetOutput, expectSetFailed, expectInfoLogged } from './test-support/expect';
 import { jira, github, urls, fixtures } from './test-support/fixtures';
 
 describe('syncAutolinks', () => {
@@ -44,8 +43,8 @@ describe('syncAutolinks', () => {
 
     expect(deletedIds).not.toContain(12); // Should not delete non-JIRA autolinks
 
-    expect(env.coreSpies.setOutput).toHaveBeenCalledWith('projects-synced', 2);
-    expect(env.coreSpies.setOutput).toHaveBeenCalledWith('autolinks-processed', expect.any(Number));
+    expect(env.mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 2);
+    expect(env.mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', expect.any(Number));
   });
 
   test('creates new autolinks for new projects', async () => {
@@ -71,8 +70,8 @@ describe('syncAutolinks', () => {
       is_alphanumeric: true
     });
 
-    expectSetOutput(env.coreSpies, 'projects-synced', 1);
-    expectSetOutput(env.coreSpies, 'autolinks-processed', 1);
+    expect(env.mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 1);
+    expect(env.mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', 1);
   });
 
   test('skips when autolink is up to date', async () => {
@@ -97,7 +96,7 @@ describe('syncAutolinks', () => {
 
     await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    expectSetFailed(env.coreSpies, expect.stringContaining('Cannot resolve JIRA URL'));
+    expect(env.mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining('Cannot resolve JIRA URL'));
   });
 
   test('error handling uses mapJiraError for JIRA errors', async () => {
@@ -116,7 +115,7 @@ describe('syncAutolinks', () => {
 
     await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    expectSetFailed(env.coreSpies, 'JIRA API error (418): teapot error');
+    expect(env.mockCore.setFailed).toHaveBeenCalledWith('JIRA API error (418): teapot error');
   });
 
   test('withRetry integration with JIRA API', async () => {
@@ -187,10 +186,10 @@ describe('syncAutolinks with dry-run', () => {
     expect(env.githubMocks.octokit.rest.repos.createAutolink).not.toHaveBeenCalled();
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).not.toHaveBeenCalled();
 
-    expectSetOutput(env.coreSpies, 'projects-synced', 2);
-    expectSetOutput(env.coreSpies, 'autolinks-processed', 3);
+    expect(env.mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 2);
+    expect(env.mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', 3);
 
-    expectInfoLogged(env.coreSpies, '=== DRY RUN MODE ===');
-    expectInfoLogged(env.coreSpies, `[DRY RUN] Would create autolink for PLAN1- -> ${urls.jiraBrowse('PLAN1')}`);
+    expect(env.mockCore.info).toHaveBeenCalledWith('=== DRY RUN MODE ===');
+    expect(env.mockCore.info).toHaveBeenCalledWith(`[DRY RUN] Would create autolink for PLAN1- -> ${urls.jiraBrowse('PLAN1')}`);
   });
 });

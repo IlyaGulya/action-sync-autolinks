@@ -1,40 +1,33 @@
-import { spyOn } from 'bun:test';
 import * as core from '@actions/core';
+import { createDeepMock, DeepMock } from './mock-utils';
 
-export interface CoreSpies {
-  getInput: ReturnType<typeof spyOn>;
-  setOutput: ReturnType<typeof spyOn>;
-  setFailed: ReturnType<typeof spyOn>;
-  info: ReturnType<typeof spyOn>;
-  error: ReturnType<typeof spyOn>;
-  warning: ReturnType<typeof spyOn>;
-  debug: ReturnType<typeof spyOn>;
-}
+/**
+ * Creates a deep mock of the @actions/core module with console output suppressed.
+ *
+ * All functions from `@actions/core` are replaced with `bun:test` mocks that
+ * wrap empty functions, preventing any output from being logged during tests.
+ * The `getInput` function is overridden to return values from the provided
+ * `inputs` map, allowing for easy simulation of action inputs.
+ *
+ * @param inputs - A record of input names to their string values.
+ * @returns A `DeepMock` of the `@actions/core` module.
+ */
+export function createMockCore(inputs: Record<string, string> = {}): DeepMock<typeof core> {
+  // Create a base shape where every function in the `core` module is a no-op.
+  // This is the key to suppressing console output during tests.
+  const baseShapeWithNoOps = Object.fromEntries(
+    Object.keys(core).map(key => [key, () => {}])
+  );
 
-export function createCoreSpies(inputs: Record<string, string> = {}): CoreSpies {
-  return {
-    getInput: spyOn(core, 'getInput').mockImplementation((name: string) => inputs[name] ?? ''),
-    setOutput: spyOn(core, 'setOutput').mockImplementation(() => {}),
-    setFailed: spyOn(core, 'setFailed').mockImplementation(() => {}),
-    info: spyOn(core, 'info').mockImplementation(() => {}),
-    error: spyOn(core, 'error').mockImplementation(() => {}),
-    warning: spyOn(core, 'warning').mockImplementation(() => {}),
-    debug: spyOn(core, 'debug').mockImplementation(() => {}),
+  // Create the final shape for our mock, using the no-op base
+  // and overriding `getInput` with our custom implementation.
+  const shape = {
+    ...baseShapeWithNoOps,
+    getInput: (name: string) => inputs[name] ?? '',
   };
-}
 
-export function restoreCoreSpies(spies: CoreSpies) {
-  Object.values(spies).forEach(spy => spy.mockRestore());
-}
-
-export function createMockCore(spies: CoreSpies): typeof core {
-  return {
-    getInput: spies.getInput,
-    setOutput: spies.setOutput,
-    setFailed: spies.setFailed,
-    info: spies.info,
-    error: spies.error,
-    warning: spies.warning,
-    debug: spies.debug,
-  } as typeof core;
+  // createDeepMock will now wrap our no-op functions, not the real ones.
+  // The `as any` is a safe cast because we've built a shape that is
+  // structurally compatible for mocking purposes.
+  return createDeepMock<typeof core>(shape as any);
 }

@@ -1,7 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
 import { useTestEnv } from './test-support/use-test-env';
-import { expectErrorLogged } from './test-support/expect';
 
 describe('GitHub helper functions', () => {
   const env = useTestEnv();
@@ -41,7 +40,7 @@ describe('GitHub helper functions', () => {
     test('logs & rethrows on error', async () => {
       env.githubMocks.octokit.rest.repos.createAutolink.mockRejectedValue(new Error('fail'));
       expect(createAutolink(env.githubMocks.octokit, env.owner, env.repo, 'K-', 'url', env.mockCore)).rejects.toThrow('fail');
-      expectErrorLogged(env.coreSpies, expect.stringContaining('Failed to create autolink for K-'));
+      expect(env.mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Failed to create autolink for K-'));
     });
   });
 
@@ -65,7 +64,7 @@ describe('GitHub helper functions', () => {
     test('logs & rethrows on error', async () => {
       env.githubMocks.octokit.rest.repos.deleteAutolink.mockRejectedValue(new Error('delete failed'));
       expect(deleteAutolink(env.githubMocks.octokit, env.owner, env.repo, 123, env.mockCore)).rejects.toThrow('delete failed');
-      expectErrorLogged(env.coreSpies, expect.stringContaining('Failed to delete autolink 123'));
+      expect(env.mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Failed to delete autolink 123'));
     });
   });
 });

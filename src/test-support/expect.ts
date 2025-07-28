@@ -1,29 +1,7 @@
 import { expect } from 'bun:test';
-import { CoreSpies } from './core';
 
-export function expectInfoLogged(spies: CoreSpies, msg: string) {
-  expect(spies.info).toHaveBeenCalledWith(msg);
-}
-
-export function expectErrorLogged(spies: CoreSpies, msg: string) {
-  expect(spies.error).toHaveBeenCalledWith(msg);
-}
-
-export function expectWarningLogged(spies: CoreSpies, msg: string) {
-  expect(spies.warning).toHaveBeenCalledWith(msg);
-}
-
-export function expectDebugLogged(spies: CoreSpies, msg: string) {
-  expect(spies.debug).toHaveBeenCalledWith(msg);
-}
-
-export function expectSetFailed(spies: CoreSpies, msg: string) {
-  expect(spies.setFailed).toHaveBeenCalledWith(msg);
-}
-
-export function expectSetOutput(spies: CoreSpies, name: string, value: string | number) {
-  expect(spies.setOutput).toHaveBeenCalledWith(name, value);
-}
+// The helper functions for core (expectInfoLogged, expectErrorLogged, etc.)
+// are no longer needed and have been removed. The others remain.
 
 export function expectCreateCalled(octokit: any, owner: string, repo: string, key: string, url: string) {
   expect(octokit.rest.repos.createAutolink).toHaveBeenCalledWith({

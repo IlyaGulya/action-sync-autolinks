@@ -2,7 +2,6 @@ import { describe, test, expect } from 'bun:test';
 import { applyAutolinkPlan, applyAutolinkOp, applyAutolinkPlanDryRun } from './apply';
 import { useTestEnv } from './test-support';
 import { op } from './test-support';
-import { expectInfoLogged, expectErrorLogged } from './test-support';
 
 describe('applyAutolinkOp', () => {
   const env = useTestEnv();
@@ -26,7 +25,7 @@ describe('applyAutolinkOp', () => {
       url_template: 'https://example.atlassian.net/browse/TEST-<num>',
       is_alphanumeric: true
     });
-    expectInfoLogged(env.coreSpies, 'Creating autolink for TEST-');
+    expect(env.mockCore.info).toHaveBeenCalledWith('Creating autolink for TEST-');
   });
 
   test('applies update operation', async () => {
@@ -58,7 +57,7 @@ describe('applyAutolinkOp', () => {
       url_template: 'https://new.atlassian.net/browse/UPDATE-<num>',
       is_alphanumeric: true
     });
-    expectInfoLogged(env.coreSpies, 'Updating autolink for UPDATE-');
+    expect(env.mockCore.info).toHaveBeenCalledWith('Updating autolink for UPDATE-');
   });
 
   test('applies delete operation', async () => {
@@ -77,7 +76,7 @@ describe('applyAutolinkOp', () => {
       repo: env.repo,
       autolink_id: 789
     });
-    expectInfoLogged(env.coreSpies, 'Deleting obsolete autolink: OLD-');
+    expect(env.mockCore.info).toHaveBeenCalledWith('Deleting obsolete autolink: OLD-');
   });
 });
 
@@ -120,7 +119,7 @@ describe('applyAutolinkPlan', () => {
     expect(applyAutolinkPlan(env.githubMocks.octokit, env.owner, env.repo, operations, env.mockCore))
       .rejects.toThrow('GitHub API error');
 
-    expectErrorLogged(env.coreSpies, expect.stringContaining('Failed to apply create operation for NEW-'));
+    expect(env.mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Failed to apply create operation for NEW-'));
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).not.toHaveBeenCalled();
   });
 });
@@ -138,10 +137,10 @@ describe('applyAutolinkPlanDryRun', () => {
     const result = applyAutolinkPlanDryRun(operations, env.mockCore);
 
     expect(result).toBe(3);
-    expectInfoLogged(env.coreSpies, '=== DRY RUN MODE ===');
-    expectInfoLogged(env.coreSpies, '[DRY RUN] Would create autolink for NEW- -> https://example.atlassian.net/browse/NEW-<num>');
-    expectInfoLogged(env.coreSpies, '[DRY RUN] Would update autolink 456 for UPDATE- -> https://new.com/UPDATE-<num>');
-    expectInfoLogged(env.coreSpies, '[DRY RUN] Would delete autolink 123 for OLD-');
+    expect(env.mockCore.info).toHaveBeenCalledWith('=== DRY RUN MODE ===');
+    expect(env.mockCore.info).toHaveBeenCalledWith('[DRY RUN] Would create autolink for NEW- -> https://example.atlassian.net/browse/NEW-<num>');
+    expect(env.mockCore.info).toHaveBeenCalledWith('[DRY RUN] Would update autolink 456 for UPDATE- -> https://new.com/UPDATE-<num>');
+    expect(env.mockCore.info).toHaveBeenCalledWith('[DRY RUN] Would delete autolink 123 for OLD-');
   });
 
   test('handles empty operations', () => {
@@ -150,7 +149,7 @@ describe('applyAutolinkPlanDryRun', () => {
     const result = applyAutolinkPlanDryRun(operations, env.mockCore);
 
     expect(result).toBe(0);
-    expectInfoLogged(env.coreSpies, '=== DRY RUN MODE ===');
-    expect(env.coreSpies.info).toHaveBeenCalledTimes(1);
+    expect(env.mockCore.info).toHaveBeenCalledWith('=== DRY RUN MODE ===');
+    expect(env.mockCore.info).toHaveBeenCalledTimes(1);
   });
 });
