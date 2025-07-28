@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mockFetch, clearFetchMocks } from '@aryzing/bun-mock-fetch';
 import { getJiraQueues, mapJiraError } from './jira';
-import { mockFetchJson } from './test-utils';
+import { mockFetchJson, clearFetchMocks } from './test-support';
+import {mockFetch} from "@aryzing/bun-mock-fetch";
 
 const jiraUrl = 'https://example.atlassian.net';
 const username = 'u';
@@ -105,8 +105,6 @@ describe('getJiraQueues', () => {
       { key: 'AAA', name: 'Proj A', id: '1' },
       { key: 'BBB', name: 'Proj B', id: '3' }
     ]);
-
-    // Note: mockFetch automatically validates the URL and method
   });
 
   test('invalid response format throws', async () => {
@@ -124,5 +122,4 @@ describe('getJiraQueues', () => {
     expect(getJiraQueues(jiraUrl, username, token))
       .rejects.toThrow('HTTP 500: Server Error');
   });
-
 });

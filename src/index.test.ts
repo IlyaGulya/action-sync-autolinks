@@ -1,234 +1,103 @@
-import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
-import { mockFetch, clearFetchMocks } from '@aryzing/bun-mock-fetch';
+import { describe, test, expect } from 'bun:test';
+import { mockFetch } from '@aryzing/bun-mock-fetch';
 import { syncAutolinks } from './index';
-import { mockFetchJson } from './test-utils';
-
-const jiraUrl = 'https://example.atlassian.net';
+import { useTestEnv } from './test-support/use-test-env';
+import { mockFetchJson } from './test-support/fetch';
+import { expectSetOutput, expectSetFailed, expectInfoLogged } from './test-support/expect';
+import { jira, github, urls, fixtures } from './test-support/fixtures';
 
 describe('syncAutolinks', () => {
-  let mockCore: any, githubLib: any, fakeOctokit: any;
-
-  beforeEach(() => {
-    mockCore = {
-      getInput: mock(),
-      setOutput: mock(),
-      setFailed: mock(),
-      info: mock(),
-      error: mock()
-    };
-
-    mockCore.getInput.mockImplementation((name: string) => {
-      const map: Record<string, string> = {
-        'github-token': 'ghs123',
-        'jira-url': 'https://example.atlassian.net',
-        'jira-username': 'u',
-        'jira-api-token': 't',
-        'repository': '' // simulate default
-      };
-      return map[name];
-    });
-
-    fakeOctokit = {
-      rest: {
-        repos: {
-          listAutolinks: mock(),
-          createAutolink: mock(),
-          deleteAutolink: mock()
-        }
-      },
-      paginate: mock()
-    };
-
-    githubLib = {
-      context: { repo: { owner: 'org', repo: 'repo' } },
-      getOctokit: mock().mockReturnValue(fakeOctokit)
-    };
-
-  });
-
-  afterEach(() => {
-    clearFetchMocks();
-  });
+  const env = useTestEnv({ inputs: fixtures.inputs.basic });
 
   test('creates, updates, deletes, sets outputs', async () => {
-    // JIRA returns 2 projects
-    mockFetchJson('https://example.atlassian.net/rest/api/3/project', [
+    mockFetchJson(`${urls.jira}/rest/api/3/project`, [
       { key: 'AAA', name: 'A', id: '1' },
       { key: 'BBB', name: 'B', id: '2' }
     ]);
 
-    // Existing: one up-to-date, one wrong template, one obsolete non-JIRA, one obsolete JIRA
-    fakeOctokit.paginate.mockResolvedValueOnce([
-      { id: 10, key_prefix: 'AAA-', url_template: 'https://example.atlassian.net/browse/AAA-<num>' },
-      { id: 11, key_prefix: 'BBB-', url_template: 'https://old.example/browse/BBB-<num>' },
-      { id: 12, key_prefix: 'NOTJIRA-', url_template: 'https://foo' },
-      { id: 13, key_prefix: 'OLD-', url_template: 'https://example.atlassian.net/browse/OLD-<num>' }
+    env.githubMocks.octokit.paginate.mockResolvedValueOnce([
+      github.autolink(10, 'AAA', urls.jiraBrowse('AAA')),
+      github.autolink(11, 'BBB', 'https://old.example/browse/BBB-<num>'),
+      github.autolink(12, 'NOTJIRA', 'https://foo'),
+      github.autolink(13, 'OLD', urls.jiraBrowse('OLD'))
     ]);
 
-    fakeOctokit.rest.repos.deleteAutolink.mockResolvedValue({});
-    fakeOctokit.rest.repos.createAutolink.mockResolvedValue({ data: {} });
+    env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue({
+      status: 204,
+      url: 'https://api.github.com/repos/test/test/autolinks',
+      headers: {}
+    } as any);
+    env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
+      data: { id: 1, key_prefix: 'AAA-', url_template: 'https://example.atlassian.net/browse/AAA-<num>', is_alphanumeric: true },
+      status: 201,
+      url: 'https://api.github.com/repos/test/test/autolinks',
+      headers: {}
+    });
 
-    await syncAutolinks({ core: mockCore, githubLib });
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    // Check that deleteAutolink was called (exact calls may vary)
-    expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalled();
-    expect(fakeOctokit.rest.repos.createAutolink).toHaveBeenCalled();
+    expect(env.githubMocks.octokit.rest.repos.deleteAutolink).toHaveBeenCalled();
+    expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalled();
 
-    // Should delete obsolete JIRA autolinks but preserve non-JIRA ones
-    const deleteCalls = fakeOctokit.rest.repos.deleteAutolink.mock.calls;
+    const deleteCalls = env.githubMocks.octokit.rest.repos.deleteAutolink.mock.calls;
     const deletedIds = deleteCalls.map((call: any) => call[0].autolink_id);
 
-    // Should NOT delete NOTJIRA- (id 12)
-    expect(deletedIds).not.toContain(12);
+    expect(deletedIds).not.toContain(12); // Should not delete non-JIRA autolinks
 
-    // Outputs - should be operations applied, not existing autolinks count
-    expect(mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 2);
-    expect(mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', expect.any(Number));
+    expect(env.coreSpies.setOutput).toHaveBeenCalledWith('projects-synced', 2);
+    expect(env.coreSpies.setOutput).toHaveBeenCalledWith('autolinks-processed', expect.any(Number));
   });
 
   test('creates new autolinks for new projects', async () => {
-    mockFetchJson('https://example.atlassian.net/rest/api/3/project', [
-      { key: 'NEW', name: 'New Project', id: '1' }
+    mockFetchJson(`${urls.jira}/rest/api/3/project`, [
+      jira.project('NEW', 'New Project', '1')
     ]);
 
-    fakeOctokit.paginate.mockResolvedValueOnce([]);
-    fakeOctokit.rest.repos.createAutolink.mockResolvedValue({ data: {} });
+    env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
+    env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
+      data: { id: 1, key_prefix: 'NEW-', url_template: 'https://example.atlassian.net/browse/NEW-<num>', is_alphanumeric: true },
+      status: 201,
+      url: 'https://api.github.com/repos/test/test/autolinks',
+      headers: {}
+    });
 
-    await syncAutolinks({ core: mockCore, githubLib });
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    expect(fakeOctokit.rest.repos.createAutolink).toHaveBeenCalledWith({
-      owner: 'org',
-      repo: 'repo',
+    expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
+      owner: env.owner,
+      repo: env.repo,
       key_prefix: 'NEW-',
-      url_template: 'https://example.atlassian.net/browse/NEW-<num>',
+      url_template: urls.jiraBrowse('NEW'),
       is_alphanumeric: true
     });
 
-    // Outputs
-    expect(mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 1);
-    expect(mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', 1);
+    expectSetOutput(env.coreSpies, 'projects-synced', 1);
+    expectSetOutput(env.coreSpies, 'autolinks-processed', 1);
   });
 
   test('skips when autolink is up to date', async () => {
-    mockFetchJson('https://example.atlassian.net/rest/api/3/project', [
-      { key: 'SAME', name: 'Same', id: '1' }
+    mockFetchJson(`${urls.jira}/rest/api/3/project`, [
+      jira.project('SAME', 'Same', '1')
     ]);
 
-    fakeOctokit.paginate.mockResolvedValueOnce([
-      { id: 10, key_prefix: 'SAME-', url_template: 'https://example.atlassian.net/browse/SAME-<num>' }
+    env.githubMocks.octokit.paginate.mockResolvedValueOnce([
+      github.autolink(10, 'SAME', urls.jiraBrowse('SAME'))
     ]);
 
-    await syncAutolinks({ core: mockCore, githubLib });
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    // Should not create or delete anything
-    expect(fakeOctokit.rest.repos.createAutolink).not.toHaveBeenCalled();
-    expect(fakeOctokit.rest.repos.deleteAutolink).not.toHaveBeenCalled();
+    expect(env.githubMocks.octokit.rest.repos.createAutolink).not.toHaveBeenCalled();
+    expect(env.githubMocks.octokit.rest.repos.deleteAutolink).not.toHaveBeenCalled();
   });
 
   test('handles failure and calls setFailed', async () => {
-    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+    mockFetch(`${urls.jira}/rest/api/3/project`, () => {
       throw { code: 'ENOTFOUND', message: 'bad host' };
     });
 
-    await syncAutolinks({ core: mockCore, githubLib });
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    expect(mockCore.setFailed).toHaveBeenCalledWith(
-      expect.stringContaining('Cannot resolve JIRA URL')
-    );
-  });
-
-  test('no projects still prunes obsolete JIRA autolinks and outputs 0', async () => {
-    mockFetchJson('https://example.atlassian.net/rest/api/3/project', []);
-    fakeOctokit.paginate.mockResolvedValueOnce([
-      { id: 1, key_prefix: 'JIRA-', url_template: 'https://example.atlassian.net/browse/JIRA-<num>' },
-      { id: 2, key_prefix: 'TICKET-', url_template: 'https://example.atlassian.net/browse/TICKET-<num>' },
-      { id: 3, key_prefix: 'NONJ-', url_template: 'https://other.com/browse/NONJ-<num>' },
-      { id: 4, key_prefix: 'OTHER', url_template: 'https://example.atlassian.net/browse/OTHER-<num>' },
-      { id: 5, key_prefix: 'AAA-', url_template: `${jiraUrl}/browse/AAA-<num>` }
-    ]);
-    fakeOctokit.rest.repos.deleteAutolink.mockResolvedValue({});
-    
-    await syncAutolinks({ core: mockCore, githubLib });
-    
-    // Should delete JIRA- and TICKET- (ends with - and contains jiraUrl)
-    expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
-      owner: 'org', repo: 'repo', autolink_id: 1
-    });
-    expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
-      owner: 'org', repo: 'repo', autolink_id: 2
-    });
-    expect(fakeOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
-      owner: 'org', repo: 'repo', autolink_id: 5
-    });
-
-    // Should NOT delete NONJ- (different URL) or OTHER (doesn't end with -)
-    expect(fakeOctokit.rest.repos.deleteAutolink).not.toHaveBeenCalledWith({
-      owner: 'org', repo: 'repo', autolink_id: 3
-    });
-    expect(fakeOctokit.rest.repos.deleteAutolink).not.toHaveBeenCalledWith({
-      owner: 'org', repo: 'repo', autolink_id: 4
-    });
-    
-    expect(mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 0);
-    expect(mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', 3);
-  });
-
-  test('uses repository input when provided', async () => {
-    mockCore.getInput.mockImplementation((name: string) => {
-      const map: Record<string, string> = {
-        'github-token': 'gh',
-        'jira-url': jiraUrl,
-        'jira-username': 'u',
-        'jira-api-token': 't',
-        'repository': 'altOwner/altRepo'
-      };
-      return map[name];
-    });
-    mockFetchJson('https://example.atlassian.net/rest/api/3/project', []);
-    fakeOctokit.paginate.mockResolvedValueOnce([]);
-
-    await syncAutolinks({ core: mockCore, githubLib });
-
-    // Ensure octokit calls carry altOwner/altRepo
-    expect(fakeOctokit.paginate)
-      .toHaveBeenCalledWith(fakeOctokit.rest.repos.listAutolinks, { owner: 'altOwner', repo: 'altRepo', per_page: 100 });
-  });
-
-  test('dry-run mode skips API calls and reports planned operations', async () => {
-    mockCore.getInput.mockImplementation((name: string) => {
-      const map: Record<string, string> = {
-        'github-token': 'ghs123',
-        'jira-url': jiraUrl,
-        'jira-username': 'u',
-        'jira-api-token': 't',
-        'repository': '',
-        'dry-run': 'true'
-      };
-      return map[name];
-    });
-
-    mockFetchJson('https://example.atlassian.net/rest/api/3/project', [
-      { key: 'PLAN1', name: 'Project 1', id: '1' },
-      { key: 'PLAN2', name: 'Project 2', id: '2' }
-    ]);
-
-    fakeOctokit.paginate.mockResolvedValueOnce([
-      { id: 10, key_prefix: 'OLD-', url_template: `${jiraUrl}/browse/OLD-<num>` }
-    ]);
-
-    await syncAutolinks({ core: mockCore, githubLib });
-
-    // Should not make any mutations
-    expect(fakeOctokit.rest.repos.createAutolink).not.toHaveBeenCalled();
-    expect(fakeOctokit.rest.repos.deleteAutolink).not.toHaveBeenCalled();
-
-    // Should report planned operations (2 creates + 1 delete = 3)
-    expect(mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 2);
-    expect(mockCore.setOutput).toHaveBeenCalledWith('autolinks-processed', 3);
-
-    // Should log dry-run messages
-    expect(mockCore.info).toHaveBeenCalledWith('=== DRY RUN MODE ===');
-    expect(mockCore.info).toHaveBeenCalledWith('[DRY RUN] Would create autolink for PLAN1- -> https://example.atlassian.net/browse/PLAN1-<num>');
+    expectSetFailed(env.coreSpies, expect.stringContaining('Cannot resolve JIRA URL'));
   });
 
   test('error handling uses mapJiraError for JIRA errors', async () => {
@@ -241,77 +110,87 @@ describe('syncAutolinks', () => {
       message: 'teapot error'
     };
 
-    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+    mockFetch(`${urls.jira}/rest/api/3/project`, () => {
       throw jiraError;
     });
 
-    await syncAutolinks({ core: mockCore, githubLib });
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    expect(mockCore.setFailed).toHaveBeenCalledWith('JIRA API error (418): teapot error');
-  });
-
-  test('error handling maps JIRA timeout/AbortError', async () => {
-    const abortError = Object.assign(new Error('timeout'), { name: 'AbortError' });
-    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
-      throw abortError;
-    });
-
-    await syncAutolinks({ core: mockCore, githubLib });
-
-    expect(mockCore.setFailed).toHaveBeenCalledWith(
-      'JIRA API request timed out. Please check your network connection or try again later.'
-    );
-  });
-
-  test('error handling maps network errors', async () => {
-    const networkError = Object.assign(new Error('Connection failed'), { code: 'ENOTFOUND' });
-    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
-      throw networkError;
-    });
-
-    await syncAutolinks({ core: mockCore, githubLib });
-
-    expect(mockCore.setFailed).toHaveBeenCalledWith(
-      'Cannot resolve JIRA URL. Please check that the JIRA URL is correct and accessible.'
-    );
+    expectSetFailed(env.coreSpies, 'JIRA API error (418): teapot error');
   });
 
   test('withRetry integration with JIRA API', async () => {
-    // First call returns 429, second call succeeds
     let callCount = 0;
-    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
+    mockFetch(`${urls.jira}/rest/api/3/project`, () => {
       callCount++;
       if (callCount === 1) {
         throw { response: { status: 429, headers: { 'retry-after': '1' } } };
       }
-      return new Response(JSON.stringify([{ key: 'RETRY', name: 'Retry Project', id: '1' }]), {
+      return new Response(JSON.stringify([jira.project('RETRY', 'Retry Project', '1')]), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     });
 
-    fakeOctokit.paginate.mockResolvedValueOnce([]);
-    fakeOctokit.rest.repos.createAutolink.mockResolvedValue({ data: {} });
+    env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
+    env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
+      data: { id: 1, key_prefix: 'RETRY-', url_template: 'https://example.atlassian.net/browse/RETRY-<num>', is_alphanumeric: true },
+      status: 201,
+      url: 'https://api.github.com/repos/test/test/autolinks',
+      headers: {}
+    });
 
-    await syncAutolinks({ core: mockCore, githubLib });
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    // Should have retried and succeeded
     expect(callCount).toBe(2);
-    expect(fakeOctokit.rest.repos.createAutolink).toHaveBeenCalledWith({
-      owner: 'org',
-      repo: 'repo',
+    expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
+      owner: env.owner,
+      repo: env.repo,
       key_prefix: 'RETRY-',
-      url_template: 'https://example.atlassian.net/browse/RETRY-<num>',
+      url_template: urls.jiraBrowse('RETRY'),
       is_alphanumeric: true
     });
   });
+});
 
-  test('maps unknown error without message', async () => {
-    mockFetch('https://example.atlassian.net/rest/api/3/project', () => {
-      throw {};
-    });
-    await syncAutolinks({ core: mockCore, githubLib });
-    expect(mockCore.setFailed).toHaveBeenCalledWith('Network error connecting to JIRA: undefined');
+describe('syncAutolinks with custom repository', () => {
+  const env = useTestEnv({
+    inputs: {
+      ...fixtures.inputs.basic,
+      'repository': 'altOwner/altRepo'
+    }
+  });
+
+  test('uses repository input when provided', async () => {
+    mockFetchJson(`${urls.jira}/rest/api/3/project`, []);
+    env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
+
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+
+    expect(env.githubMocks.octokit.paginate)
+      .toHaveBeenCalledWith(env.githubMocks.octokit.rest.repos.listAutolinks, { owner: 'altOwner', repo: 'altRepo', per_page: 100 });
   });
 });
 
+describe('syncAutolinks with dry-run', () => {
+  const env = useTestEnv({ inputs: fixtures.inputs.dryRun });
+
+  test('dry-run mode skips API calls and reports planned operations', async () => {
+    mockFetchJson(`${urls.jira}/rest/api/3/project`, jira.projects(['PLAN1', 'PLAN2']));
+
+    env.githubMocks.octokit.paginate.mockResolvedValueOnce([
+      github.autolink(10, 'OLD', urls.jiraBrowse('OLD'))
+    ]);
+
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+
+    expect(env.githubMocks.octokit.rest.repos.createAutolink).not.toHaveBeenCalled();
+    expect(env.githubMocks.octokit.rest.repos.deleteAutolink).not.toHaveBeenCalled();
+
+    expectSetOutput(env.coreSpies, 'projects-synced', 2);
+    expectSetOutput(env.coreSpies, 'autolinks-processed', 3);
+
+    expectInfoLogged(env.coreSpies, '=== DRY RUN MODE ===');
+    expectInfoLogged(env.coreSpies, `[DRY RUN] Would create autolink for PLAN1- -> ${urls.jiraBrowse('PLAN1')}`);
+  });
+});

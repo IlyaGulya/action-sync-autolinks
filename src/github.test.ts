@@ -1,47 +1,37 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { describe, test, expect } from 'bun:test';
 import { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
+import { useTestEnv } from './test-support/use-test-env';
+import { expectErrorLogged } from './test-support/expect';
 
 describe('GitHub helper functions', () => {
-  let mockOctokit: any;
-
-  beforeEach(() => {
-    mockOctokit = {
-      rest: {
-        repos: {
-          listAutolinks: mock(),
-          createAutolink: mock(),
-          deleteAutolink: mock()
-        }
-      },
-      paginate: mock()
-    };
-  });
+  const env = useTestEnv();
 
   describe('getExistingAutolinks', () => {
     test('returns data on success', async () => {
-      mockOctokit.paginate.mockResolvedValue([
+      env.githubMocks.octokit.paginate.mockResolvedValue([
         { id: 1, key_prefix: 'test-', url_template: 'https://test.com/<num>', is_alphanumeric: true }
       ]);
 
-      const mockCore = { error: mock() } as any;
-      const result = await getExistingAutolinks(mockOctokit, 'owner', 'repo', mockCore);
+      const result = await getExistingAutolinks(env.githubMocks.octokit, env.owner, env.repo, env.mockCore);
       expect(result).toEqual([{ id: 1, key_prefix: 'test-', url_template: 'https://test.com/<num>', is_alphanumeric: true }]);
     });
   });
 
   describe('createAutolink', () => {
     test('calls API with correct parameters', async () => {
-      mockOctokit.rest.repos.createAutolink.mockResolvedValue({
-        data: { id: 1, key_prefix: 'TEST-', url_template: 'https://test.com/<num>', is_alphanumeric: true }
+      env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
+        data: { id: 1, key_prefix: 'TEST-', url_template: 'https://test.com/<num>', is_alphanumeric: true },
+        status: 201,
+        url: 'https://api.github.com/repos/test/test/autolinks',
+        headers: {}
       });
 
-      const mockCore = { info: mock(), error: mock() } as any;
-      const result = await createAutolink(mockOctokit, 'owner', 'repo', 'TEST-', 'https://test.com/<num>', mockCore);
+      const result = await createAutolink(env.githubMocks.octokit, env.owner, env.repo, 'TEST-', 'https://test.com/<num>', env.mockCore);
       expect(result).toEqual({ id: 1, key_prefix: 'TEST-', url_template: 'https://test.com/<num>', is_alphanumeric: true });
 
-      expect(mockOctokit.rest.repos.createAutolink).toHaveBeenCalledWith({
-        owner: 'owner',
-        repo: 'repo',
+      expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
+        owner: env.owner,
+        repo: env.repo,
         key_prefix: 'TEST-',
         url_template: 'https://test.com/<num>',
         is_alphanumeric: true
@@ -49,32 +39,33 @@ describe('GitHub helper functions', () => {
     });
 
     test('logs & rethrows on error', async () => {
-      const mockCore = { info: mock(), error: mock() } as any;
-      mockOctokit.rest.repos.createAutolink.mockRejectedValue(new Error('fail'));
-      expect(createAutolink(mockOctokit, 'o', 'r', 'K-', 'url', mockCore)).rejects.toThrow('fail');
-      expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Failed to create autolink for K-'));
+      env.githubMocks.octokit.rest.repos.createAutolink.mockRejectedValue(new Error('fail'));
+      expect(createAutolink(env.githubMocks.octokit, env.owner, env.repo, 'K-', 'url', env.mockCore)).rejects.toThrow('fail');
+      expectErrorLogged(env.coreSpies, expect.stringContaining('Failed to create autolink for K-'));
     });
   });
 
   describe('deleteAutolink', () => {
     test('calls API with correct parameters', async () => {
-      mockOctokit.rest.repos.deleteAutolink.mockResolvedValue({});
+      env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue({
+        status: 204,
+        url: 'https://api.github.com/repos/test/test/autolinks/123',
+        headers: {}
+      } as any);
 
-      const mockCore = { info: mock(), error: mock() } as any;
-      await deleteAutolink(mockOctokit, 'owner', 'repo', 123, mockCore);
+      await deleteAutolink(env.githubMocks.octokit, env.owner, env.repo, 123, env.mockCore);
 
-      expect(mockOctokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
-        owner: 'owner',
-        repo: 'repo',
+      expect(env.githubMocks.octokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
+        owner: env.owner,
+        repo: env.repo,
         autolink_id: 123
       });
     });
 
     test('logs & rethrows on error', async () => {
-      const mockCore = { info: mock(), error: mock() } as any;
-      mockOctokit.rest.repos.deleteAutolink.mockRejectedValue(new Error('delete failed'));
-      expect(deleteAutolink(mockOctokit, 'o', 'r', 123, mockCore)).rejects.toThrow('delete failed');
-      expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Failed to delete autolink 123'));
+      env.githubMocks.octokit.rest.repos.deleteAutolink.mockRejectedValue(new Error('delete failed'));
+      expect(deleteAutolink(env.githubMocks.octokit, env.owner, env.repo, 123, env.mockCore)).rejects.toThrow('delete failed');
+      expectErrorLogged(env.coreSpies, expect.stringContaining('Failed to delete autolink 123'));
     });
   });
 });

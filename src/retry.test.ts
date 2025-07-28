@@ -1,5 +1,5 @@
-import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
-import { withRetry, DEFAULT_RETRY_OPTIONS } from './retry';
+import {afterEach, beforeEach, describe, expect, mock, test} from 'bun:test';
+import {withRetry} from './retry';
 
 describe('withRetry', () => {
   let originalMathRandom: () => number;
@@ -24,11 +24,11 @@ describe('withRetry', () => {
   test('retries on retryable HTTP status codes', async () => {
     const operation = mock();
     operation
-      .mockImplementationOnce(() => Promise.reject({ response: { status: 503 } }))
-      .mockImplementationOnce(() => Promise.reject({ response: { status: 502 } }))
+      .mockImplementationOnce(() => Promise.reject({response: {status: 503}}))
+      .mockImplementationOnce(() => Promise.reject({response: {status: 502}}))
       .mockImplementationOnce(() => Promise.resolve('success'));
 
-    const result = await withRetry(operation, { baseDelay: 0, maxDelay: 0 });
+    const result = await withRetry(operation, {baseDelay: 0, maxDelay: 0});
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(3);
@@ -36,10 +36,10 @@ describe('withRetry', () => {
 
   test('retries on direct status property', async () => {
     const operation = mock()
-      .mockRejectedValueOnce({ status: 429 })
+      .mockRejectedValueOnce({status: 429})
       .mockResolvedValueOnce('success');
 
-    const result = await withRetry(operation, { baseDelay: 0 });
+    const result = await withRetry(operation, {baseDelay: 0});
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(2);
@@ -48,46 +48,45 @@ describe('withRetry', () => {
   test('retries on network error codes', async () => {
     const operation = mock();
     operation
-      .mockImplementationOnce(() => Promise.reject({ code: 'ECONNRESET' }))
-      .mockImplementationOnce(() => Promise.reject({ code: 'ETIMEDOUT' }))
+      .mockImplementationOnce(() => Promise.reject({code: 'ECONNRESET'}))
+      .mockImplementationOnce(() => Promise.reject({code: 'ETIMEDOUT'}))
       .mockImplementationOnce(() => Promise.resolve('success'));
 
-    const result = await withRetry(operation, { baseDelay: 0 });
+    const result = await withRetry(operation, {baseDelay: 0});
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(3);
   });
 
   test('stops retrying on non-retryable status codes', async () => {
-    const operation = mock().mockRejectedValue({ response: { status: 400 } });
+    const operation = mock().mockRejectedValue({response: {status: 400}});
 
-    await expect(withRetry(operation, { baseDelay: 0 })).rejects.toEqual({ response: { status: 400 } });
+    expect(withRetry(operation, {baseDelay: 0})).rejects.toEqual({response: {status: 400}});
     expect(operation).toHaveBeenCalledTimes(1);
   });
 
   test('stops retrying on non-retryable errors', async () => {
     const operation = mock().mockRejectedValue(new Error('Not retryable'));
 
-    expect(withRetry(operation, { baseDelay: 0 })).rejects.toThrow('Not retryable');
+    expect(withRetry(operation, {baseDelay: 0})).rejects.toThrow('Not retryable');
     expect(operation).toHaveBeenCalledTimes(1);
   });
 
   test('respects maxAttempts limit', async () => {
-    const operation = mock().mockRejectedValue({ response: { status: 503 } });
+    const operation = mock().mockRejectedValue({response: {status: 503}});
 
-    await expect(withRetry(operation, { maxAttempts: 2, baseDelay: 0 }))
-      .rejects.toEqual({ response: { status: 503 } });
+    expect(withRetry(operation, {maxAttempts: 2, baseDelay: 0})).rejects.toEqual({response: {status: 503}});
     expect(operation).toHaveBeenCalledTimes(2);
   });
 
   test('exponential backoff with short delays', async () => {
     const operation = mock();
     operation
-      .mockImplementationOnce(() => Promise.reject({ response: { status: 503 } }))
-      .mockImplementationOnce(() => Promise.reject({ response: { status: 503 } }))
+      .mockImplementationOnce(() => Promise.reject({response: {status: 503}}))
+      .mockImplementationOnce(() => Promise.reject({response: {status: 503}}))
       .mockImplementationOnce(() => Promise.resolve('success'));
 
-    const result = await withRetry(operation, { baseDelay: 0, maxDelay: 0 });
+    const result = await withRetry(operation, {baseDelay: 0, maxDelay: 0});
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(3);
@@ -95,20 +94,20 @@ describe('withRetry', () => {
 
   test('uses default options when not specified', async () => {
     const operation = mock()
-      .mockRejectedValueOnce({ response: { status: 503 } })
+      .mockRejectedValueOnce({response: {status: 503}})
       .mockResolvedValueOnce('success');
 
-    const result = await withRetry(operation, { baseDelay: 0 });
+    const result = await withRetry(operation, {baseDelay: 0});
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(2);
   });
 
   test('throws error when all retries exhausted', async () => {
-    const operation = mock().mockRejectedValue({ response: { status: 503 } });
+    const operation = mock().mockRejectedValue({response: {status: 503}});
 
-    await expect(withRetry(operation, { maxAttempts: 1, baseDelay: 0 }))
-      .rejects.toEqual({ response: { status: 503 } });
+    expect(withRetry(operation, {maxAttempts: 1, baseDelay: 0}))
+      .rejects.toEqual({response: {status: 503}});
   });
 
   test('handles undefined lastError edge case', async () => {
@@ -117,7 +116,7 @@ describe('withRetry', () => {
       throw undefined;
     });
 
-    await expect(withRetry(operation, { maxAttempts: 1, baseDelay: 0 }))
+    expect(withRetry(operation, {maxAttempts: 1, baseDelay: 0}))
       .rejects.toThrow('Operation failed after retries');
   });
 });

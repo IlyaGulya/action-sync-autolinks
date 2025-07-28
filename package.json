@@ -6,7 +6,7 @@
   "scripts": {
     "test": "bun test",
     "build": "bun build src/index.ts --outdir dist --target node --minify",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc"
   },
   "keywords": ["github-action", "jira", "autolinks", "sync"],
   "author": "IlyaGulya",

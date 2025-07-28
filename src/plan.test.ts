@@ -1,48 +1,36 @@
 import { describe, test, expect } from 'bun:test';
 import { buildAutolinkPlan } from './plan';
-import { JiraProject, GithubAutolink } from './types';
-
-const jiraUrl = 'https://example.atlassian.net';
+import { jira, github, urls } from './test-support/fixtures';
 
 describe('buildAutolinkPlan', () => {
   test('creates new autolinks for new projects', () => {
-    const jiraProjects: JiraProject[] = [
-      { key: 'NEW', name: 'New Project', id: '1' },
-      { key: 'ANOTHER', name: 'Another Project', id: '2' }
-    ];
-    const existingAutolinks: GithubAutolink[] = [];
+    const jiraProjects = jira.projects(['NEW', 'ANOTHER']);
+    const existingAutolinks: import('./types').GithubAutolink[] = [];
 
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
 
     expect(plan.operations).toHaveLength(2);
     expect(plan.operations[0]).toEqual({
       kind: 'create',
       keyPrefix: 'NEW-',
-      urlTemplate: `${jiraUrl}/browse/NEW-<num>`
+      urlTemplate: urls.jiraBrowse('NEW')
     });
     expect(plan.operations[1]).toEqual({
       kind: 'create',
       keyPrefix: 'ANOTHER-',
-      urlTemplate: `${jiraUrl}/browse/ANOTHER-<num>`
+      urlTemplate: urls.jiraBrowse('ANOTHER')
     });
     expect(plan.metrics.projectsSynced).toBe(2);
     expect(plan.metrics.operationsPlanned).toBe(2);
   });
 
   test('skips up-to-date autolinks', () => {
-    const jiraProjects: JiraProject[] = [
-      { key: 'SAME', name: 'Same Project', id: '1' }
-    ];
-    const existingAutolinks: GithubAutolink[] = [
-      {
-        id: 10,
-        key_prefix: 'SAME-',
-        url_template: `${jiraUrl}/browse/SAME-<num>`,
-        is_alphanumeric: true
-      }
+    const jiraProjects = [jira.project('SAME')];
+    const existingAutolinks = [
+      github.autolink(10, 'SAME', urls.jiraBrowse('SAME'))
     ];
 
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
 
     expect(plan.operations).toHaveLength(0);
     expect(plan.metrics.projectsSynced).toBe(1);
@@ -50,47 +38,30 @@ describe('buildAutolinkPlan', () => {
   });
 
   test('updates autolinks with different URL templates', () => {
-    const jiraProjects: JiraProject[] = [
-      { key: 'UPDATE', name: 'Update Project', id: '1' }
-    ];
-    const existingAutolinks: GithubAutolink[] = [
-      {
-        id: 10,
-        key_prefix: 'UPDATE-',
-        url_template: 'https://old.atlassian.net/browse/UPDATE-<num>',
-        is_alphanumeric: true
-      }
+    const jiraProjects = [jira.project('UPDATE')];
+    const existingAutolinks = [
+      github.autolink(10, 'UPDATE', 'https://old.atlassian.net/browse/UPDATE-<num>')
     ];
 
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
 
     expect(plan.operations).toHaveLength(1);
     expect(plan.operations[0]).toEqual({
       kind: 'update',
       autolinkId: 10,
       keyPrefix: 'UPDATE-',
-      urlTemplate: `${jiraUrl}/browse/UPDATE-<num>`
+      urlTemplate: urls.jiraBrowse('UPDATE')
     });
   });
 
   test('deletes obsolete JIRA autolinks', () => {
-    const jiraProjects: JiraProject[] = [];
-    const existingAutolinks: GithubAutolink[] = [
-      {
-        id: 10,
-        key_prefix: 'OLD-',
-        url_template: `${jiraUrl}/browse/OLD-<num>`,
-        is_alphanumeric: true
-      },
-      {
-        id: 11,
-        key_prefix: 'LEGACY-',
-        url_template: `${jiraUrl}/browse/LEGACY-<num>`,
-        is_alphanumeric: true
-      }
-    ];
+    const jiraProjects: import('./types').JiraProject[] = [];
+    const existingAutolinks = github.autolinks([
+      { id: 10, key: 'OLD', url: urls.jiraBrowse('OLD') },
+      { id: 11, key: 'LEGACY', url: urls.jiraBrowse('LEGACY') }
+    ]);
 
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
 
     expect(plan.operations).toHaveLength(2);
     expect(plan.operations).toContainEqual({
@@ -106,105 +77,52 @@ describe('buildAutolinkPlan', () => {
   });
 
   test('preserves non-JIRA autolinks', () => {
-    const jiraProjects: JiraProject[] = [];
-    const existingAutolinks: GithubAutolink[] = [
-      {
-        id: 10,
-        key_prefix: 'GITHUB-',
-        url_template: 'https://github.com/owner/repo/issues/<num>',
-        is_alphanumeric: true
-      },
-      {
-        id: 11,
-        key_prefix: 'ZENDESK',
-        url_template: 'https://company.zendesk.com/tickets/<num>',
-        is_alphanumeric: true
-      },
-      {
-        id: 12,
-        key_prefix: 'OTHER-',
-        url_template: 'https://different.example.com/browse/OTHER-<num>',
-        is_alphanumeric: true
-      }
-    ];
+    const jiraProjects: import('./types').JiraProject[] = [];
+    const existingAutolinks = github.autolinks([
+      { id: 10, key: 'GITHUB', url: 'https://github.com/owner/repo/issues/<num>' },
+      { id: 11, key: 'ZENDESK', url: 'https://company.zendesk.com/tickets/<num>' },
+      { id: 12, key: 'OTHER', url: 'https://different.example.com/browse/OTHER-<num>' }
+    ]);
 
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
 
     expect(plan.operations).toHaveLength(0);
     expect(plan.metrics.operationsPlanned).toBe(0);
   });
 
   test('handles URL normalization correctly', () => {
-    const jiraProjects: JiraProject[] = [
-      { key: 'NORM', name: 'Normalize Test', id: '1' }
-    ];
-    
-    // Test trailing slash normalization
-    const existingAutolinks: GithubAutolink[] = [
-      {
-        id: 10,
-        key_prefix: 'NORM-',
-        url_template: `${jiraUrl}/browse/NORM-<num>/`,
-        is_alphanumeric: true
-      }
+    const jiraProjects = [jira.project('NORM')];
+    const existingAutolinks = [
+      github.autolink(10, 'NORM', `${urls.jiraBrowse('NORM')}/`)
     ];
 
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
 
     expect(plan.operations).toHaveLength(0);
   });
 
-
   test('mixed scenario: create, update, delete, preserve', () => {
-    const jiraProjects: JiraProject[] = [
-      { key: 'KEEP', name: 'Keep Project', id: '1' },
-      { key: 'UPDATE', name: 'Update Project', id: '2' },
-      { key: 'NEW', name: 'New Project', id: '3' }
-    ];
-    const existingAutolinks: GithubAutolink[] = [
-      // Keep this one (up to date)
-      {
-        id: 10,
-        key_prefix: 'KEEP-',
-        url_template: `${jiraUrl}/browse/KEEP-<num>`,
-        is_alphanumeric: true
-      },
-      // Update this one (different URL)
-      {
-        id: 11,
-        key_prefix: 'UPDATE-',
-        url_template: 'https://old.atlassian.net/browse/UPDATE-<num>',
-        is_alphanumeric: true
-      },
-      // Delete this one (obsolete JIRA)
-      {
-        id: 12,
-        key_prefix: 'OLD-',
-        url_template: `${jiraUrl}/browse/OLD-<num>`,
-        is_alphanumeric: true
-      },
-      // Preserve this one (non-JIRA)
-      {
-        id: 13,
-        key_prefix: 'GITHUB-',
-        url_template: 'https://github.com/owner/repo/issues/<num>',
-        is_alphanumeric: true
-      }
-    ];
+    const jiraProjects = jira.projects(['KEEP', 'UPDATE', 'NEW']);
+    const existingAutolinks = github.autolinks([
+      { id: 10, key: 'KEEP', url: urls.jiraBrowse('KEEP') },
+      { id: 11, key: 'UPDATE', url: 'https://old.atlassian.net/browse/UPDATE-<num>' },
+      { id: 12, key: 'OLD', url: urls.jiraBrowse('OLD') },
+      { id: 13, key: 'GITHUB', url: 'https://github.com/owner/repo/issues/<num>' }
+    ]);
 
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
 
     expect(plan.operations).toHaveLength(3);
     expect(plan.operations).toContainEqual({
       kind: 'create',
       keyPrefix: 'NEW-',
-      urlTemplate: `${jiraUrl}/browse/NEW-<num>`
+      urlTemplate: urls.jiraBrowse('NEW')
     });
     expect(plan.operations).toContainEqual({
       kind: 'update',
       autolinkId: 11,
       keyPrefix: 'UPDATE-',
-      urlTemplate: `${jiraUrl}/browse/UPDATE-<num>`
+      urlTemplate: urls.jiraBrowse('UPDATE')
     });
     expect(plan.operations).toContainEqual({
       kind: 'delete',
