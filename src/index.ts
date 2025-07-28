@@ -1,10 +1,11 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import {SyncDependencies} from './types';
-import {getJiraQueues, mapJiraError} from './jira';
+import {getJiraQueues} from './jira';
 import {getExistingAutolinks} from './github';
 import {buildAutolinkPlan} from './plan';
 import {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';
+import {mapJiraError} from "./mapJiraError";
 
 export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
   try {
