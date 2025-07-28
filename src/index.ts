@@ -1,23 +1,23 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { SyncDependencies } from './types';
-import { getJiraQueues } from './jira';
-import { getExistingAutolinks } from './github';
-import { buildAutolinkPlan } from './plan';
-import { applyAutolinkPlan, applyAutolinkPlanDryRun } from './apply';
+import {SyncDependencies} from './types';
+import {getJiraQueues, mapJiraError} from './jira';
+import {getExistingAutolinks} from './github';
+import {buildAutolinkPlan} from './plan';
+import {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';
 
 export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
   try {
     const {
       core: coreLib = core,
-      githubLib = github
+      githubLib = github,
     } = deps;
 
     // Get inputs
-    const githubToken = coreLib.getInput('github-token', { required: true });
-    const jiraUrl = coreLib.getInput('jira-url', { required: true });
-    const jiraUsername = coreLib.getInput('jira-username', { required: true });
-    const jiraApiToken = coreLib.getInput('jira-api-token', { required: true });
+    const githubToken = coreLib.getInput('github-token', {required: true});
+    const jiraUrl = coreLib.getInput('jira-url', {required: true});
+    const jiraUsername = coreLib.getInput('jira-username', {required: true});
+    const jiraApiToken = coreLib.getInput('jira-api-token', {required: true});
     let currentRepo = githubLib.context.repo;
     let currentRepoStr = currentRepo.owner + '/' + currentRepo.repo;
     const repository = coreLib.getInput('repository') || currentRepoStr;
@@ -56,9 +56,8 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
     coreLib.setOutput('autolinks-processed', operationsApplied);
 
   } catch (error: any) {
-    const { core: coreLib = core } = deps;
+    const {core: coreLib = core} = deps;
     // Import mapJiraError here to handle JIRA-specific errors
-    const { mapJiraError } = await import('./jira');
     const errorMessage = mapJiraError(error);
     coreLib.setFailed(errorMessage);
   }
@@ -69,8 +68,8 @@ if (require.main === module || (process.env.NODE_ENV !== 'test' && process.env.G
   syncAutolinks();
 }
 
-export { getJiraQueues } from './jira';
-export { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
-export { buildAutolinkPlan } from './plan';
-export type { AutolinkOp } from './plan';
-export { applyAutolinkPlan, applyAutolinkPlanDryRun } from './apply';
+export {getJiraQueues} from './jira';
+export {getExistingAutolinks, createAutolink, deleteAutolink} from './github';
+export {buildAutolinkPlan} from './plan';
+export type {AutolinkOp} from './plan';
+export {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';
