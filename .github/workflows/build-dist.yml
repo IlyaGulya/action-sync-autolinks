@@ -41,12 +41,31 @@ jobs:
           echo "changed=false" >> $GITHUB_OUTPUT
         fi
 
-    - name: Commit and push if dist changed
+    - name: Bump version and commit
       if: steps.verify-changed-files.outputs.changed == 'true'
+      id: bump-version
       # language=bash
       run: |
+        CURRENT_VERSION=$(jq -r '.version' package.json)
+        NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+        jq --arg version "$NEW_VERSION" '.version = $version' package.json > package.json.tmp
+        mv package.json.tmp package.json
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "Bumped version from $CURRENT_VERSION to $NEW_VERSION"
+
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add dist/
-        git commit -m "chore: update dist with latest build [skip ci]"
-        git push
+        git add dist/ package.json
+        git commit -m "release $NEW_VERSION"
+        git tag "v$NEW_VERSION"
+        git push --follow-tags
+
+    - name: Create GitHub Release
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # language=bash
+      run: |
+        gh release create "v${{ steps.bump-version.outputs.new_version }}" \
+          --title "v${{ steps.bump-version.outputs.new_version }}" \
+          --generate-notes
