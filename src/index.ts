@@ -30,8 +30,8 @@ export async function run(deps: SyncDependencies = {}): Promise<void> {
   }
 }
 
-// Run the action
-if (require.main === module || (process.env.NODE_ENV !== 'test' && process.env.GITHUB_ACTIONS)) {
+// Run the action when inside GitHub Actions (but not during tests)
+if (process.env.GITHUB_ACTIONS && process.env.NODE_ENV !== 'test') {
   run().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
