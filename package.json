@@ -1,6 +1,6 @@
 {
   "name": "action-sync-autolinks",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GitHub Action to sync JIRA queues with repository autolinks",
   "main": "index.ts",
   "scripts": {
