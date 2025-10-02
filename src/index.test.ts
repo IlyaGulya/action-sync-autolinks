@@ -1,10 +1,10 @@
 import { describe, test, expect } from 'bun:test';
 import { mockFetch } from '@aryzing/bun-mock-fetch';
 import { syncAutolinks } from './index';
-import { useTestEnv } from './test-support/use-test-env';
-import { mockFetchJson } from './test-support/fetch';
-import { jira, github, urls, fixtures } from './test-support/fixtures';
-import { mockInstantSetTimeout } from './test-support/mock-utils';
+import { useTestEnv } from './test-support';
+import { mockFetchJson } from './test-support';
+import { jira, github, urls, fixtures } from './test-support';
+import { mockInstantSetTimeout } from './test-support';
 
 describe('syncAutolinks', () => {
   const env = useTestEnv({ inputs: fixtures.inputs.basic });
@@ -102,9 +102,9 @@ describe('syncAutolinks', () => {
 
   test('error handling uses mapJiraError for JIRA errors', async () => {
     const jiraError = {
-      response: { 
-        status: 418, 
-        data: { errorMessages: ['I am a teapot'] }, 
+      response: {
+        status: 418,
+        data: { errorMessages: ['I am a teapot'] },
         headers: { 'retry-after': '60' }
       },
       message: 'teapot error'

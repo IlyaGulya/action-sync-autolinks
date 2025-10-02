@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { buildAutolinkPlan } from './plan';
-import { jira, github, urls } from './test-support/fixtures';
+import { jira, github, urls } from './test-support';
 
 describe('buildAutolinkPlan', () => {
   test('creates new autolinks for new projects', () => {
