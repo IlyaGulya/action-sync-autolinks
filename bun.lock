@@ -10,7 +10,7 @@
       "devDependencies": {
         "@aryzing/bun-mock-fetch": "^1.0.3",
         "@octokit/types": "15.0.0",
-        "@types/bun": "^1.2.19",
+        "@types/bun": "^1.2.23",
         "@types/node": "^22.13.17",
         "typescript": "^5.6.3",
       },
