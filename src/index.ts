@@ -2,6 +2,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import {SyncDependencies} from './types';
 import {getJiraProjects} from './jira';
+import {getJiraProjectCategories} from './jira-categories';
 import {getExistingAutolinks} from './github';
 import {buildAutolinkPlan} from './plan';
 import {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';
@@ -23,6 +24,36 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
 
     const [owner, repo] = repository.split('/');
     const octokit = githubLib.getOctokit(inputs.githubToken);
+
+    // Check if running in list-categories mode
+    const listCategories = coreLib.getInput('list-categories')?.toLowerCase() === 'true';
+
+    if (listCategories) {
+      coreLib.info('Running in list-categories mode');
+      coreLib.info(`JIRA URL: ${inputs.jiraUrl}`);
+
+      try {
+        const categories = await getJiraProjectCategories(
+          inputs.jiraUrl,
+          inputs.jiraUsername,
+          inputs.jiraApiToken
+        );
+
+        coreLib.info(`\nFound ${categories.length} project categories:\n`);
+        for (const category of categories) {
+          const description = category.description ? ` - ${category.description}` : '';
+          coreLib.info(`  ID: ${category.id}, Name: ${category.name}${description}`);
+        }
+
+        coreLib.info('\nTo filter projects by category, use the project-category-ids input:');
+        coreLib.info('  project-category-ids: \'10000,10001\'');
+
+        return;
+      } catch (error: any) {
+        coreLib.setFailed(mapJiraError(error));
+        return;
+      }
+    }
 
     coreLib.info(`Syncing autolinks for ${repository}`);
     coreLib.info(`JIRA URL: ${inputs.jiraUrl}`);
@@ -47,6 +78,16 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
     }
 
     coreLib.info(`Found ${jiraProjects.length} JIRA projects`);
+
+    // Check GitHub's 500 autolinks limit
+    if (jiraProjects.length > 500) {
+      coreLib.setFailed(
+        `Found ${jiraProjects.length} JIRA projects, but GitHub only supports up to 500 autolinks per repository.\n` +
+        `Please use the 'project-category-ids' input to filter projects by category.\n` +
+        `Run with 'list-categories: true' to see available categories and their IDs.`
+      );
+      return;
+    }
 
     // Fetch existing autolinks
     coreLib.info('Fetching existing autolinks...');

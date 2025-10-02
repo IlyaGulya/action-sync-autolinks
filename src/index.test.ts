@@ -216,3 +216,139 @@ describe('syncAutolinks with dry-run', () => {
     expect(env.mockCore.info).toHaveBeenCalledWith(`[DRY RUN] Would create autolink for PLAN1- -> ${urls.jiraBrowse('PLAN1')}`);
   });
 });
+
+describe('syncAutolinks with 500 projects limit', () => {
+  const env = useTestEnv({ inputs: fixtures.inputs.basic });
+
+  test('fails when more than 500 projects are returned', async () => {
+    // Generate 501 projects
+    const manyProjects = Array.from({ length: 501 }, (_, i) => ({
+      key: `PROJ${i}`,
+      name: `Project ${i}`,
+      id: `${i}`
+    }));
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, {
+      isLast: false,
+      values: manyProjects.slice(0, 100)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=100&maxResults=100`, {
+      isLast: false,
+      values: manyProjects.slice(100, 200)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=200&maxResults=100`, {
+      isLast: false,
+      values: manyProjects.slice(200, 300)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=300&maxResults=100`, {
+      isLast: false,
+      values: manyProjects.slice(300, 400)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=400&maxResults=100`, {
+      isLast: false,
+      values: manyProjects.slice(400, 500)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=500&maxResults=100`, {
+      isLast: true,
+      values: manyProjects.slice(500, 501)
+    });
+
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+
+    expect(env.mockCore.setFailed).toHaveBeenCalledWith(
+      expect.stringContaining('Found 501 JIRA projects, but GitHub only supports up to 500 autolinks')
+    );
+    expect(env.mockCore.setFailed).toHaveBeenCalledWith(
+      expect.stringContaining('project-category-ids')
+    );
+    expect(env.mockCore.setFailed).toHaveBeenCalledWith(
+      expect.stringContaining('list-categories: true')
+    );
+  });
+
+  test('succeeds when exactly 500 projects are returned', async () => {
+    // Generate exactly 500 projects
+    const projects = Array.from({ length: 500 }, (_, i) => ({
+      key: `PROJ${i}`,
+      name: `Project ${i}`,
+      id: `${i}`
+    }));
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, {
+      isLast: false,
+      values: projects.slice(0, 100)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=100&maxResults=100`, {
+      isLast: false,
+      values: projects.slice(100, 200)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=200&maxResults=100`, {
+      isLast: false,
+      values: projects.slice(200, 300)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=300&maxResults=100`, {
+      isLast: false,
+      values: projects.slice(300, 400)
+    });
+
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=400&maxResults=100`, {
+      isLast: true,
+      values: projects.slice(400, 500)
+    });
+
+    env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
+
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+
+    expect(env.mockCore.setFailed).not.toHaveBeenCalledWith(
+      expect.stringContaining('but GitHub only supports up to 500 autolinks')
+    );
+    expect(env.mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 500);
+  });
+});
+
+describe('syncAutolinks with list-categories mode', () => {
+  const env = useTestEnv({
+    inputs: {
+      ...fixtures.inputs.basic,
+      'list-categories': 'true'
+    }
+  });
+
+  test('lists categories and exits without syncing', async () => {
+    mockFetchJson(`${urls.jira}/rest/api/3/projectCategory`, [
+      { id: '10000', name: 'FIRST', description: 'First Project Category', self: 'https://example.atlassian.net/rest/api/3/projectCategory/10000' },
+      { id: '10001', name: 'SECOND', description: 'Second Project Category', self: 'https://example.atlassian.net/rest/api/3/projectCategory/10001' }
+    ]);
+
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+
+    expect(env.mockCore.info).toHaveBeenCalledWith('Running in list-categories mode');
+    expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Found 2 project categories'));
+    expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('ID: 10000, Name: FIRST'));
+    expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('ID: 10001, Name: SECOND'));
+    expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('project-category-ids'));
+
+    // Should not perform any sync operations
+    expect(env.githubMocks.octokit.paginate).not.toHaveBeenCalled();
+    expect(env.mockCore.setOutput).not.toHaveBeenCalled();
+  });
+
+  test('handles list-categories error and calls setFailed', async () => {
+    mockFetch(`${urls.jira}/rest/api/3/projectCategory`, () => {
+      throw { code: 'ENOTFOUND', message: 'bad host' };
+    });
+
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+
+    expect(env.mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining('Cannot resolve JIRA URL'));
+  });
+});

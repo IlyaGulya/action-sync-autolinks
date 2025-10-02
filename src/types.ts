@@ -23,6 +23,13 @@ export interface PageBeanProject {
   values: any[];
 }
 
+export interface ProjectCategory {
+  id: string;
+  name: string;
+  description?: string;
+  self?: string;
+}
+
 export interface JiraApiError extends Error {
   response?: {
     status: number;

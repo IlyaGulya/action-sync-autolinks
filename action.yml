@@ -27,6 +27,10 @@ inputs:
   project-category-ids:
     description: 'Filter JIRA projects by category ID (optional, comma-separated for multiple)'
     required: false
+  list-categories:
+    description: 'List all available JIRA project categories and exit (no sync performed)'
+    required: false
+    default: 'false'
 
 outputs:
   projects-synced:

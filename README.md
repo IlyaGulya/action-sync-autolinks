@@ -16,6 +16,8 @@ This ensures that issue references (e.g., `PROJECT-123`) in issues, pull request
 - Updates existing autolinks if JIRA URL changes
 - Removes obsolete JIRA autolinks when projects are deleted
 - Preserves non-JIRA autolinks
+- Filter projects by category (supports GitHub's 500 autolinks limit)
+- Discover available project categories
 
 ## Usage
 
@@ -53,16 +55,57 @@ jobs:
     dry-run: 'true'  # Optional: test changes without applying them
 ```
 
+### Filtering by Project Category
+
+GitHub has a limit of 500 autolinks per repository. If your JIRA instance has more than 500 projects, you must filter them by category.
+
+**Step 1: Discover Available Categories**
+
+```yaml
+- uses: IlyaGulya/action-sync-autolinks@master
+  with:
+    jira-url: ${{ secrets.JIRA_URL }}
+    jira-username: ${{ vars.JIRA_USERNAME }}
+    jira-api-token: ${{ secrets.JIRA_API_TOKEN }}
+    list-categories: 'true'  # Discovery mode - lists categories and exits
+```
+
+This will output available categories:
+```
+Found 3 project categories:
+
+  ID: 10000, Name: ENGINEERING - Engineering Projects
+  ID: 10001, Name: MARKETING - Marketing Campaigns
+  ID: 10002, Name: SUPPORT - Customer Support
+
+To filter projects by category, use the project-category-ids input:
+  project-category-ids: '10000,10001'
+```
+
+**Step 2: Filter Projects by Category**
+
+```yaml
+- uses: IlyaGulya/action-sync-autolinks@master
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    jira-url: ${{ secrets.JIRA_URL }}
+    jira-username: ${{ vars.JIRA_USERNAME }}
+    jira-api-token: ${{ secrets.JIRA_API_TOKEN }}
+    project-category-ids: '10000,10001'  # Only sync Engineering and Marketing projects
+```
+
 ## Inputs
 
-| Input            | Description                                               | Required | Default                    |
-|------------------|-----------------------------------------------------------|----------|----------------------------|
-| `github-token`   | GitHub token for API access                               | Yes      | `${{ github.token }}`      |
-| `jira-url`       | JIRA instance URL (e.g., `https://company.atlassian.net`) | Yes      | -                          |
-| `jira-username`  | JIRA username/email                                       | Yes      | -                          |
-| `jira-api-token` | JIRA API token                                            | Yes      | -                          |
-| `repository`     | Repository in format `owner/repo`                         | No       | `${{ github.repository }}` |
-| `dry-run`        | Run in dry-run mode (plan only, no changes)               | No       | `false`                    |
+| Input                  | Description                                                                       | Required | Default                    |
+|------------------------|-----------------------------------------------------------------------------------|----------|----------------------------|
+| `github-token`         | GitHub token for API access                                                       | Yes      | `${{ github.token }}`      |
+| `jira-url`             | JIRA instance URL (e.g., `https://company.atlassian.net`)                         | Yes      | -                          |
+| `jira-username`        | JIRA username/email                                                               | Yes      | -                          |
+| `jira-api-token`       | JIRA API token                                                                    | Yes      | -                          |
+| `repository`           | Repository in format `owner/repo`                                                 | No       | `${{ github.repository }}` |
+| `dry-run`              | Run in dry-run mode (plan only, no changes)                                       | No       | `false`                    |
+| `project-category-ids` | Filter JIRA projects by category ID (comma-separated for multiple)                | No       | -                          |
+| `list-categories`      | List all available JIRA project categories and exit (no sync performed)           | No       | `false`                    |
 
 ## Outputs
 
@@ -122,9 +165,17 @@ After running, references in issues and PRs will automatically link:
 - Verify API token and username are correct
 - Ensure user has access to JIRA projects
 
+### Too Many Projects (>500)
+- **Error**: "Found XXX JIRA projects, but GitHub only supports up to 500 autolinks per repository"
+- **Solution**: Use `project-category-ids` to filter projects by category
+- **Steps**:
+  1. Run with `list-categories: true` to see available categories
+  2. Select category IDs that match your needs
+  3. Add `project-category-ids: '10000,10001'` to filter projects
+
 ### Autolink Creation Fails
 - Repository admin permissions required for autolink management
-- Check if autolink limits are reached (GitHub has limits per repository)
+- Check if autolink limits are reached (GitHub has a 500 autolinks limit per repository)
 
 ## License
 
