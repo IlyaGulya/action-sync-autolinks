@@ -4,6 +4,7 @@ import { syncAutolinks } from './index';
 import { useTestEnv } from './test-support/use-test-env';
 import { mockFetchJson } from './test-support/fetch';
 import { jira, github, urls, fixtures } from './test-support/fixtures';
+import { mockInstantSetTimeout } from './test-support/mock-utils';
 
 describe('syncAutolinks', () => {
   const env = useTestEnv({ inputs: fixtures.inputs.basic });
@@ -119,36 +120,43 @@ describe('syncAutolinks', () => {
   });
 
   test('withRetry integration with JIRA API', async () => {
-    let callCount = 0;
-    mockFetch(`${urls.jira}/rest/api/3/project`, () => {
-      callCount++;
-      if (callCount === 1) {
-        throw { response: { status: 429, headers: { 'retry-after': '1' } } };
-      }
-      return new Response(JSON.stringify([jira.project('RETRY', 'Retry Project', '1')]), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
+    const originalSetTimeout = globalThis.setTimeout;
+    mockInstantSetTimeout();
+
+    try {
+      let callCount = 0;
+      mockFetch(`${urls.jira}/rest/api/3/project`, () => {
+        callCount++;
+        if (callCount === 1) {
+          throw { response: { status: 429, headers: { 'retry-after': '1' } } };
+        }
+        return new Response(JSON.stringify([jira.project('RETRY', 'Retry Project', '1')]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
       });
-    });
 
-    env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
-    env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
-      data: { id: 1, key_prefix: 'RETRY-', url_template: 'https://example.atlassian.net/browse/RETRY-<num>', is_alphanumeric: true },
-      status: 201,
-      url: 'https://api.github.com/repos/test/test/autolinks',
-      headers: {}
-    });
+      env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
+      env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
+        data: { id: 1, key_prefix: 'RETRY-', url_template: 'https://example.atlassian.net/browse/RETRY-<num>', is_alphanumeric: true },
+        status: 201,
+        url: 'https://api.github.com/repos/test/test/autolinks',
+        headers: {}
+      });
 
-    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+      await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
-    expect(callCount).toBe(2);
-    expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
-      owner: env.owner,
-      repo: env.repo,
-      key_prefix: 'RETRY-',
-      url_template: urls.jiraBrowse('RETRY'),
-      is_alphanumeric: true
-    });
+      expect(callCount).toBe(2);
+      expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
+        owner: env.owner,
+        repo: env.repo,
+        key_prefix: 'RETRY-',
+        url_template: urls.jiraBrowse('RETRY'),
+        is_alphanumeric: true
+      });
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
   });
 });
 

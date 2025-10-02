@@ -1,15 +1,19 @@
 import {afterEach, beforeEach, describe, expect, mock, test} from 'bun:test';
 import {withRetry} from './retry';
+import {mockInstantSetTimeout} from './test-support';
 
 describe('withRetry', () => {
   let originalMathRandom: () => number;
+  let originalSetTimeout: typeof setTimeout;
 
   beforeEach(() => {
     originalMathRandom = Math.random;
+    originalSetTimeout = globalThis.setTimeout;
   });
 
   afterEach(() => {
     Math.random = originalMathRandom;
+    globalThis.setTimeout = originalSetTimeout;
   });
 
   test('succeeds on first attempt', async () => {
@@ -130,15 +134,14 @@ describe('withRetry', () => {
       })
       .mockResolvedValueOnce('success');
 
-    const startTime = Date.now();
+    const setTimeoutMock = mockInstantSetTimeout();
+
     const result = await withRetry(operation, {baseDelay: 1000});
-    const duration = Date.now() - startTime;
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(2);
-    // Should wait ~2000ms (Retry-After value), not 1000ms (baseDelay)
-    expect(duration).toBeGreaterThanOrEqual(1900);
-    expect(duration).toBeLessThan(2500);
+    // Should wait 2000ms (Retry-After value), not 1000ms (baseDelay)
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 2000);
   });
 
   test('falls back to exponential backoff when Retry-After is invalid', async () => {
@@ -154,15 +157,14 @@ describe('withRetry', () => {
     // Mock Math.random to make jitter predictable (0% jitter)
     Math.random = () => 0.5;
 
-    const startTime = Date.now();
+    const setTimeoutMock = mockInstantSetTimeout();
+
     const result = await withRetry(operation, {baseDelay: 100, maxDelay: 1000});
-    const duration = Date.now() - startTime;
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(2);
     // Should use baseDelay (100ms) with exponential backoff, not invalid retry-after
-    expect(duration).toBeGreaterThanOrEqual(90);
-    expect(duration).toBeLessThan(200);
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 100);
   });
 
   test('caps Retry-After delay at maxDelay', async () => {
@@ -175,15 +177,14 @@ describe('withRetry', () => {
       })
       .mockResolvedValueOnce('success');
 
-    const startTime = Date.now();
+    const setTimeoutMock = mockInstantSetTimeout();
+
     const result = await withRetry(operation, {baseDelay: 1000, maxDelay: 500});
-    const duration = Date.now() - startTime;
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(2);
     // Should cap at maxDelay (500ms), not use full retry-after (100s)
-    expect(duration).toBeGreaterThanOrEqual(450);
-    expect(duration).toBeLessThan(700);
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 500);
   });
 
   test('does not add jitter when using Retry-After', async () => {
@@ -199,14 +200,13 @@ describe('withRetry', () => {
     // Mock Math.random to a value that would add significant jitter
     Math.random = () => 1.0; // Would add +25% jitter if used
 
-    const startTime = Date.now();
+    const setTimeoutMock = mockInstantSetTimeout();
+
     const result = await withRetry(operation, {baseDelay: 1000, maxDelay: 5000});
-    const duration = Date.now() - startTime;
 
     expect(result).toBe('success');
     expect(operation).toHaveBeenCalledTimes(2);
     // Should wait exactly 1000ms without jitter
-    expect(duration).toBeGreaterThanOrEqual(950);
-    expect(duration).toBeLessThan(1150);
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 1000);
   });
 });

@@ -6,6 +6,42 @@ type MockedFn<F extends AnyFn> = ReturnType<typeof mock<F>>;
 // Keys whose deep generics we don't want to recurse into
 type ProblemRoots = "request" | "graphql" | "hook";
 
+// ---- Instant setTimeout mock -----------------------------------------------
+
+/**
+ * Mocks setTimeout to execute callbacks immediately without actual delays.
+ * Useful for testing retry logic without waiting.
+ *
+ * Note: Requires manual cleanup in afterEach to restore original setTimeout.
+ *
+ * @returns The mock function (useful for assertions on delay values)
+ *
+ * @example
+ * ```ts
+ * beforeEach(() => {
+ *   originalSetTimeout = globalThis.setTimeout;
+ * });
+ *
+ * afterEach(() => {
+ *   globalThis.setTimeout = originalSetTimeout;
+ * });
+ *
+ * test('my test', () => {
+ *   const mock = mockInstantSetTimeout();
+ *   // ... test code that uses setTimeout
+ *   expect(mock).toHaveBeenCalledWith(expect.any(Function), 1000);
+ * });
+ * ```
+ */
+export function mockInstantSetTimeout(): ReturnType<typeof mock> {
+  const setTimeoutMock = mock((fn: () => void, _delay: number) => {
+    fn();
+    return 0 as any;
+  });
+  globalThis.setTimeout = setTimeoutMock as any;
+  return setTimeoutMock;
+}
+
 // ---- DeepPartial / DeepMock ------------------------------------------------
 
 export type DeepPartial<T> =
