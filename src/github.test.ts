@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
-import { useTestEnv } from './test-support';
+import { okCreate, okDelete, useTestEnv } from './test-support';
 
 describe('GitHub helper functions', () => {
   const env = useTestEnv();
@@ -18,12 +18,9 @@ describe('GitHub helper functions', () => {
 
   describe('createAutolink', () => {
     test('calls API with correct parameters', async () => {
-      env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
-        data: { id: 1, key_prefix: 'TEST-', url_template: 'https://test.com/<num>', is_alphanumeric: true },
-        status: 201,
-        url: 'https://api.github.com/repos/test/test/autolinks',
-        headers: {}
-      });
+      env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue(
+        okCreate('TEST', 'https://test.com/<num>')
+      );
 
       const result = await createAutolink(env.githubMocks.octokit, env.owner, env.repo, 'TEST-', 'https://test.com/<num>', env.mockCore);
       expect(result).toEqual({ id: 1, key_prefix: 'TEST-', url_template: 'https://test.com/<num>', is_alphanumeric: true });
@@ -46,11 +43,7 @@ describe('GitHub helper functions', () => {
 
   describe('deleteAutolink', () => {
     test('calls API with correct parameters', async () => {
-      env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue({
-        status: 204,
-        url: 'https://api.github.com/repos/test/test/autolinks/123',
-        headers: {}
-      } as any);
+      env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue(okDelete(123));
 
       await deleteAutolink(env.githubMocks.octokit, env.owner, env.repo, 123, env.mockCore);
 
