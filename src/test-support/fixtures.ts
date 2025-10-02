@@ -56,6 +56,7 @@ export const urls = {
 export const fixtures = {
   inputs: {
     basic: {
+      'action': 'sync',
       'github-token': 'ghs_test_token',
       'jira-url': JIRA_URL,
       'jira-username': 'test-user',
@@ -64,12 +65,19 @@ export const fixtures = {
       'dry-run': 'false',
     },
     dryRun: {
+      'action': 'sync',
       'github-token': 'ghs_test_token',
       'jira-url': JIRA_URL,
       'jira-username': 'test-user',
       'jira-api-token': 'test-api-token',
       'repository': '',
       'dry-run': 'true',
+    },
+    listCategories: {
+      'action': 'list-categories',
+      'jira-url': JIRA_URL,
+      'jira-username': 'test-user',
+      'jira-api-token': 'test-api-token',
     }
   }
 };

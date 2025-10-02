@@ -1,20 +1,29 @@
 import * as core from '@actions/core';
 
-export interface ValidatedInputs {
-  githubToken: string;
+// Shared JIRA authentication inputs
+export interface JiraAuthInputs {
   jiraUrl: string;
   jiraUsername: string;
   jiraApiToken: string;
+}
+
+// Sync action inputs (includes GitHub and filters)
+export interface SyncActionInputs extends JiraAuthInputs {
+  githubToken: string;
   projectCategoryFilter?: string[];
   projectTypeFilter?: string[];
   projectQuery?: string;
 }
 
-export function validateInputs(coreLib: typeof core): ValidatedInputs {
-  const validationErrors: string[] = [];
+// List-categories action inputs (only JIRA auth)
+export interface ListCategoriesActionInputs extends JiraAuthInputs {}
 
-  const githubToken = coreLib.getInput('github-token');
-  if (!githubToken) validationErrors.push('github-token is required');
+// Legacy interface for backward compatibility
+export interface ValidatedInputs extends SyncActionInputs {}
+
+// Helper: Validate JIRA authentication inputs
+function validateJiraAuthInputs(coreLib: typeof core): JiraAuthInputs {
+  const validationErrors: string[] = [];
 
   const jiraUrl = coreLib.getInput('jira-url');
   if (!jiraUrl) validationErrors.push('jira-url is required');
@@ -34,6 +43,19 @@ export function validateInputs(coreLib: typeof core): ValidatedInputs {
     process.exit(1);
   }
 
+  return {
+    jiraUrl,
+    jiraUsername,
+    jiraApiToken
+  };
+}
+
+// Helper: Parse project filters
+function parseProjectFilters(coreLib: typeof core): {
+  projectCategoryFilter?: string[];
+  projectTypeFilter?: string[];
+  projectQuery?: string;
+} {
   // Parse optional category IDs (comma-separated)
   const categoryIdsInput = coreLib.getInput('filter-project-category-ids');
   const projectCategoryFilter = categoryIdsInput
@@ -63,12 +85,44 @@ export function validateInputs(coreLib: typeof core): ValidatedInputs {
   const projectQuery = coreLib.getInput('filter-project-query') || undefined;
 
   return {
-    githubToken,
-    jiraUrl,
-    jiraUsername,
-    jiraApiToken,
     projectCategoryFilter,
     projectTypeFilter,
     projectQuery
   };
+}
+
+// Validate inputs for sync action
+export function validateSyncInputs(coreLib: typeof core): SyncActionInputs {
+  const jiraAuth = validateJiraAuthInputs(coreLib);
+
+  const validationErrors: string[] = [];
+  const githubToken = coreLib.getInput('github-token');
+  if (!githubToken) validationErrors.push('github-token is required');
+
+  if (validationErrors.length > 0) {
+    coreLib.error('Missing required inputs:');
+    for (const error of validationErrors) {
+      coreLib.error(`  - ${error}`);
+    }
+    coreLib.setFailed('Input validation failed');
+    process.exit(1);
+  }
+
+  const filters = parseProjectFilters(coreLib);
+
+  return {
+    ...jiraAuth,
+    githubToken,
+    ...filters
+  };
+}
+
+// Validate inputs for list-categories action
+export function validateListCategoriesInputs(coreLib: typeof core): ListCategoriesActionInputs {
+  return validateJiraAuthInputs(coreLib);
+}
+
+// Legacy function for backward compatibility
+export function validateInputs(coreLib: typeof core): ValidatedInputs {
+  return validateSyncInputs(coreLib);
 }

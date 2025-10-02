@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn } from 'bun:test';
-import { validateInputs } from './inputs';
+import { validateInputs, validateSyncInputs, validateListCategoriesInputs } from './inputs';
 import { createMockCore } from './test-support';
 
 describe('validateInputs', () => {
@@ -37,8 +37,8 @@ describe('validateInputs', () => {
     // Should print the header
     expect(mockCore.error).toHaveBeenCalledWith('Missing required inputs:');
 
-    // Should print each error
-    expect(mockCore.error).toHaveBeenCalledWith('  - github-token is required');
+    // Since validateInputs now calls validateSyncInputs, it validates JIRA credentials first
+    // and exits before checking github-token, so we only check for JIRA errors here
     expect(mockCore.error).toHaveBeenCalledWith('  - jira-url is required');
     expect(mockCore.error).toHaveBeenCalledWith('  - jira-username is required');
     expect(mockCore.error).toHaveBeenCalledWith('  - jira-api-token is required');
@@ -225,5 +225,149 @@ describe('validateInputs', () => {
     const result = validateInputs(mockCore);
 
     expect(result.projectQuery).toBeUndefined();
+  });
+});
+
+describe('validateSyncInputs', () => {
+  test('returns validated inputs for sync action', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+    });
+
+    const result = validateSyncInputs(mockCore);
+
+    expect(result).toEqual({
+      githubToken: 'ghp_token',
+      jiraUrl: 'https://example.atlassian.net',
+      jiraUsername: 'user@example.com',
+      jiraApiToken: 'api-token',
+      projectCategoryFilter: undefined,
+      projectTypeFilter: undefined,
+      projectQuery: undefined,
+    });
+  });
+
+  test('exits when github-token is missing', () => {
+    const mockCore = createMockCore({
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+    });
+    const mockExit = spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as any);
+
+    try {
+      validateSyncInputs(mockCore);
+    } catch (error: any) {
+      // Expected to throw due to mocked process.exit
+    }
+
+    expect(mockCore.error).toHaveBeenCalledWith('Missing required inputs:');
+    expect(mockCore.error).toHaveBeenCalledWith('  - github-token is required');
+    expect(mockCore.setFailed).toHaveBeenCalledWith('Input validation failed');
+    expect(mockExit).toHaveBeenCalledWith(1);
+
+    mockExit.mockRestore();
+  });
+
+  test('exits when JIRA credentials are missing', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+    });
+    const mockExit = spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as any);
+
+    try {
+      validateSyncInputs(mockCore);
+    } catch (error: any) {
+      // Expected to throw due to mocked process.exit
+    }
+
+    expect(mockCore.error).toHaveBeenCalledWith('Missing required inputs:');
+    expect(mockCore.error).toHaveBeenCalledWith('  - jira-url is required');
+    expect(mockCore.error).toHaveBeenCalledWith('  - jira-username is required');
+    expect(mockCore.error).toHaveBeenCalledWith('  - jira-api-token is required');
+    expect(mockCore.setFailed).toHaveBeenCalledWith('Input validation failed');
+
+    mockExit.mockRestore();
+  });
+
+  test('includes project filters when provided', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      'filter-project-category-ids': 'cat1,cat2',
+      'filter-project-type': 'software',
+      'filter-project-query': 'api',
+    });
+
+    const result = validateSyncInputs(mockCore);
+
+    expect(result.projectCategoryFilter).toEqual(['cat1', 'cat2']);
+    expect(result.projectTypeFilter).toEqual(['software']);
+    expect(result.projectQuery).toBe('api');
+  });
+});
+
+describe('validateListCategoriesInputs', () => {
+  test('returns validated inputs for list-categories action', () => {
+    const mockCore = createMockCore({
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+    });
+
+    const result = validateListCategoriesInputs(mockCore);
+
+    expect(result).toEqual({
+      jiraUrl: 'https://example.atlassian.net',
+      jiraUsername: 'user@example.com',
+      jiraApiToken: 'api-token',
+    });
+  });
+
+  test('does not require github-token', () => {
+    const mockCore = createMockCore({
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      // Note: no github-token
+    });
+
+    const result = validateListCategoriesInputs(mockCore);
+
+    expect(result).toHaveProperty('jiraUrl');
+    expect(result).toHaveProperty('jiraUsername');
+    expect(result).toHaveProperty('jiraApiToken');
+    // Should not have githubToken
+    expect(result).not.toHaveProperty('githubToken');
+  });
+
+  test('exits when JIRA credentials are missing', () => {
+    const mockCore = createMockCore({});
+    const mockExit = spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as any);
+
+    try {
+      validateListCategoriesInputs(mockCore);
+    } catch (error: any) {
+      // Expected to throw due to mocked process.exit
+    }
+
+    expect(mockCore.error).toHaveBeenCalledWith('Missing required inputs:');
+    expect(mockCore.error).toHaveBeenCalledWith('  - jira-url is required');
+    expect(mockCore.error).toHaveBeenCalledWith('  - jira-username is required');
+    expect(mockCore.error).toHaveBeenCalledWith('  - jira-api-token is required');
+    expect(mockCore.setFailed).toHaveBeenCalledWith('Input validation failed');
+
+    mockExit.mockRestore();
   });
 });

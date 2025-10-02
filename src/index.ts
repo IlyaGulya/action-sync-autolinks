@@ -1,136 +1,38 @@
 import * as core from '@actions/core';
-import * as github from '@actions/github';
 import {SyncDependencies} from './types';
-import {getJiraProjects} from './jira';
-import {getJiraProjectCategories} from './jira-categories';
-import {getExistingAutolinks} from './github';
-import {buildAutolinkPlan} from './plan';
-import {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';
-import {mapJiraError} from "./mapJiraError";
-import {validateInputs} from './inputs';
+import {executeSyncAction} from './actions/sync';
+import {executeListCategoriesAction} from './actions/list-categories';
 
-export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
+/**
+ * Main entry point - delegates to the appropriate action based on the 'action' input
+ */
+export async function run(deps: SyncDependencies = {}): Promise<void> {
   try {
-    const {
-      core: coreLib = core,
-      githubLib = github,
-    } = deps;
+    const {core: coreLib = core} = deps;
 
-    const inputs = validateInputs(coreLib);
+    const actionInput = coreLib.getInput('action') || 'sync';
 
-    let currentRepo = githubLib.context.repo;
-    let currentRepoStr = currentRepo.owner + '/' + currentRepo.repo;
-    const repository = coreLib.getInput('repository') || currentRepoStr;
+    switch (actionInput) {
+      case 'sync':
+        await executeSyncAction(deps);
+        break;
 
-    const [owner, repo] = repository.split('/');
-    const octokit = githubLib.getOctokit(inputs.githubToken);
+      case 'list-categories':
+        await executeListCategoriesAction(deps);
+        break;
 
-    // Check if running in list-categories mode
-    const listCategories = coreLib.getInput('list-categories')?.toLowerCase() === 'true';
-
-    if (listCategories) {
-      coreLib.info('Running in list-categories mode');
-      coreLib.info(`JIRA URL: ${inputs.jiraUrl}`);
-
-      try {
-        const categories = await getJiraProjectCategories(
-          inputs.jiraUrl,
-          inputs.jiraUsername,
-          inputs.jiraApiToken
-        );
-
-        coreLib.info(`\nFound ${categories.length} project categories:\n`);
-        for (const category of categories) {
-          const description = category.description ? ` - ${category.description}` : '';
-          coreLib.info(`  ID: ${category.id}, Name: ${category.name}${description}`);
-        }
-
-        coreLib.info('\nTo filter projects by category, use the filter-project-category-ids input:');
-        coreLib.info('  filter-project-category-ids: \'10000,10001\'');
-
-        return;
-      } catch (error: any) {
-        coreLib.setFailed(mapJiraError(error));
-        return;
-      }
+      default:
+        coreLib.setFailed(`Invalid action: ${actionInput}. Valid actions are: sync, list-categories`);
     }
-
-    coreLib.info(`Syncing autolinks for ${repository}`);
-    coreLib.info(`JIRA URL: ${inputs.jiraUrl}`);
-
-    // Fetch JIRA projects
-    coreLib.info('Fetching JIRA projects...');
-    if (inputs.projectCategoryFilter) {
-      coreLib.info(`Filtering by categories: ${inputs.projectCategoryFilter.join(', ')}`);
-    }
-    if (inputs.projectTypeFilter) {
-      coreLib.info(`Filtering by types: ${inputs.projectTypeFilter.join(', ')}`);
-    }
-    if (inputs.projectQuery) {
-      coreLib.info(`Filtering by query: "${inputs.projectQuery}"`);
-    }
-
-    let jiraProjects;
-    try {
-      jiraProjects = await getJiraProjects(
-        inputs.jiraUrl,
-        inputs.jiraUsername,
-        inputs.jiraApiToken,
-        inputs.projectCategoryFilter,
-        inputs.projectTypeFilter,
-        inputs.projectQuery
-      );
-    } catch (error: any) {
-      coreLib.setFailed(mapJiraError(error));
-      return;
-    }
-
-    coreLib.info(`Found ${jiraProjects.length} JIRA projects`);
-
-    // Check GitHub's 500 autolinks limit
-    if (jiraProjects.length > 500) {
-      coreLib.setFailed(
-        `Found ${jiraProjects.length} JIRA projects, but GitHub only supports up to 500 autolinks per repository.\n` +
-        `Please use filtering inputs to reduce the number of projects:\n` +
-        `  - 'filter-project-category-ids': Filter by category (use 'list-categories: true' to see available categories)\n` +
-        `  - 'filter-project-type': Filter by type (business, service_desk, software)\n` +
-        `  - 'filter-project-query': Filter by project key or name`
-      );
-      return;
-    }
-
-    // Fetch existing autolinks
-    coreLib.info('Fetching existing autolinks...');
-    const existingAutolinks = await getExistingAutolinks(octokit, owner, repo, coreLib);
-    coreLib.info(`Found ${existingAutolinks.length} existing autolinks`);
-
-    // Build execution plan
-    coreLib.info('Planning autolink operations...');
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, inputs.jiraUrl);
-    coreLib.info(`Planned ${plan.operations.length} operations for ${plan.metrics.projectsSynced} projects`);
-
-    // Check for dry-run mode and apply the plan
-    const dryRun = coreLib.getInput('dry-run')?.toLowerCase() === 'true';
-    const operationsApplied = dryRun
-      ? applyAutolinkPlanDryRun(plan.operations, coreLib)
-      : await applyAutolinkPlan(octokit, owner, repo, plan.operations, coreLib);
-
-    coreLib.info('Autolink sync completed successfully');
-
-    // Set outputs
-    coreLib.setOutput('projects-synced', plan.metrics.projectsSynced);
-    coreLib.setOutput('autolinks-processed', operationsApplied);
-
   } catch (error: any) {
     const {core: coreLib = core} = deps;
-    // Handle any unexpected errors (JIRA errors are handled above)
     coreLib.setFailed(error.message || 'An unexpected error occurred');
   }
 }
 
 // Run the action
 if (require.main === module || (process.env.NODE_ENV !== 'test' && process.env.GITHUB_ACTIONS)) {
-  syncAutolinks().catch(error => {
+  run().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
   });

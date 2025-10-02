@@ -3,9 +3,13 @@ description: 'Sync JIRA projects with GitHub repository autolinks'
 author: 'IlyaGulya'
 
 inputs:
+  action:
+    description: 'Action to perform: sync (default) or list-categories'
+    required: false
+    default: 'sync'
   github-token:
-    description: 'GitHub token for API access'
-    required: true
+    description: 'GitHub token for API access (required for sync action)'
+    required: false
     default: ${{ github.token }}
   jira-url:
     description: 'JIRA instance URL'
@@ -17,26 +21,22 @@ inputs:
     description: 'JIRA API token'
     required: true
   repository:
-    description: 'Repository in format owner/repo'
+    description: 'Repository in format owner/repo (used for sync action)'
     required: false
     default: ${{ github.repository }}
   dry-run:
-    description: 'Run in dry-run mode (plan only, no changes)'
+    description: 'Run in dry-run mode (plan only, no changes) (used for sync action)'
     required: false
     default: 'false'
   filter-project-category-ids:
-    description: 'Filter JIRA projects by category ID (optional, comma-separated for multiple)'
+    description: 'Filter JIRA projects by category ID (optional, comma-separated for multiple) (used for sync action)'
     required: false
   filter-project-type:
-    description: 'Filter JIRA projects by type (optional, comma-separated: business, service_desk, software)'
+    description: 'Filter JIRA projects by type (optional, comma-separated: business, service_desk, software) (used for sync action)'
     required: false
   filter-project-query:
-    description: 'Filter JIRA projects by literal string matching project key or name (case insensitive)'
+    description: 'Filter JIRA projects by literal string matching project key or name (case insensitive) (used for sync action)'
     required: false
-  list-categories:
-    description: 'List all available JIRA project categories and exit (no sync performed)'
-    required: false
-    default: 'false'
 
 outputs:
   projects-synced:
