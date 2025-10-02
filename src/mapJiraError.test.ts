@@ -74,7 +74,8 @@ describe('mapJiraError', () => {
       { message: 'weird failure' },
       'Network error connecting to JIRA: weird failure'
     ]
-  ])('maps error correctly: %s', (error: any, expected: string, _done?: any) => {
+  ])('maps error correctly: %s', (...args: any[]) => {
+    const [error, expected] = args;
     expect(mapJiraError(error)).toBe(expected);
   });
 });
