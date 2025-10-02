@@ -6,6 +6,7 @@ import {getExistingAutolinks} from './github';
 import {buildAutolinkPlan} from './plan';
 import {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';
 import {mapJiraError} from "./mapJiraError";
+import {validateInputs} from './inputs';
 
 export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> {
   try {
@@ -14,24 +15,21 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
       githubLib = github,
     } = deps;
 
-    // Get inputs
-    const githubToken = coreLib.getInput('github-token', {required: true});
-    const jiraUrl = coreLib.getInput('jira-url', {required: true});
-    const jiraUsername = coreLib.getInput('jira-username', {required: true});
-    const jiraApiToken = coreLib.getInput('jira-api-token', {required: true});
+    const inputs = validateInputs(coreLib);
+
     let currentRepo = githubLib.context.repo;
     let currentRepoStr = currentRepo.owner + '/' + currentRepo.repo;
     const repository = coreLib.getInput('repository') || currentRepoStr;
 
     const [owner, repo] = repository.split('/');
-    const octokit = githubLib.getOctokit(githubToken);
+    const octokit = githubLib.getOctokit(inputs.githubToken);
 
     coreLib.info(`Syncing autolinks for ${repository}`);
-    coreLib.info(`JIRA URL: ${jiraUrl}`);
+    coreLib.info(`JIRA URL: ${inputs.jiraUrl}`);
 
     // Fetch JIRA projects
     coreLib.info('Fetching JIRA projects...');
-    const jiraProjects = await getJiraProjects(jiraUrl, jiraUsername, jiraApiToken);
+    const jiraProjects = await getJiraProjects(inputs.jiraUrl, inputs.jiraUsername, inputs.jiraApiToken);
     coreLib.info(`Found ${jiraProjects.length} JIRA projects`);
 
     // Fetch existing autolinks
@@ -41,7 +39,7 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
 
     // Build execution plan
     coreLib.info('Planning autolink operations...');
-    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, jiraUrl);
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, inputs.jiraUrl);
     coreLib.info(`Planned ${plan.operations.length} operations for ${plan.metrics.projectsSynced} projects`);
 
     // Check for dry-run mode and apply the plan
@@ -58,8 +56,11 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
 
   } catch (error: any) {
     const {core: coreLib = core} = deps;
-    // Import mapJiraError here to handle JIRA-specific errors
-    const errorMessage = mapJiraError(error);
+    // Check if it's a validation error (has newlines from our formatting)
+    // or use the JIRA error mapper for network/API errors
+    const errorMessage = error.response || error.code || error.name === 'AbortError'
+      ? mapJiraError(error)
+      : error.message;
     coreLib.setFailed(errorMessage);
   }
 }
