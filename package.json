@@ -19,6 +19,7 @@
     "@aryzing/bun-mock-fetch": "^1.0.3",
     "@types/bun": "^1.2.19",
     "@types/node": "^22.13.17",
+    "@octokit/types": "15.0.0",
     "typescript": "^5.6.3"
   }
 }
