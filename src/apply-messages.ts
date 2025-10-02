@@ -1,4 +1,5 @@
 import { AutolinkOp } from './types';
+import { assertNever } from './utils/exhaustive';
 
 export const describeOp = (op: AutolinkOp): string => {
   switch (op.kind) {
@@ -8,5 +9,7 @@ export const describeOp = (op: AutolinkOp): string => {
       return `autolink ${op.autolinkId} for ${op.keyPrefix} -> ${op.urlTemplate}`;
     case 'delete':
       return `autolink ${op.autolinkId} for ${op.keyPrefix}`;
+    default:
+      return assertNever(op);
   }
 };

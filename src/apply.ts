@@ -2,6 +2,7 @@ import * as core from '@actions/core';
 import {AutolinkOp, Octokit} from './types';
 import {createAutolink, deleteAutolink} from './github';
 import {describeOp} from './apply-messages';
+import {assertNever} from './utils/exhaustive';
 
 export async function applyAutolinkOp(
   octokit: Octokit,
@@ -26,6 +27,9 @@ export async function applyAutolinkOp(
       coreLib.info(`Deleting obsolete ${describeOp(operation)}`);
       await deleteAutolink(octokit, owner, repo, operation.autolinkId, coreLib);
       break;
+
+    default:
+      assertNever(operation);
   }
 }
 
