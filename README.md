@@ -50,6 +50,7 @@ jobs:
     jira-username: ${{ vars.JIRA_USERNAME }}
     jira-api-token: ${{ vars.JIRA_API_TOKEN }}
     repository: 'owner/repo'  # Optional: specify different repo
+    dry-run: 'true'  # Optional: test changes without applying them
 ```
 
 ## Inputs
@@ -61,13 +62,14 @@ jobs:
 | `jira-username`  | JIRA username/email                                       | Yes      | -                          |
 | `jira-api-token` | JIRA API token                                            | Yes      | -                          |
 | `repository`     | Repository in format `owner/repo`                         | No       | `${{ github.repository }}` |
+| `dry-run`        | Run in dry-run mode (plan only, no changes)               | No       | `false`                    |
 
 ## Outputs
 
-| Output                | Description                        |
-|-----------------------|------------------------------------|
-| `projects-synced`     | Number of JIRA projects processed  |
-| `autolinks-processed` | Number of existing autolinks found |
+| Output                | Description                                            |
+|-----------------------|--------------------------------------------------------|
+| `projects-synced`     | Number of JIRA projects processed                      |
+| `autolinks-processed` | Number of autolink operations performed (create/update/delete) |
 
 ## Setup
 
