@@ -1,4 +1,5 @@
 import * as core from '@actions/core';
+import { stripTrailingSlash } from './utils/url';
 
 // Shared JIRA authentication inputs
 export interface JiraAuthInputs {
@@ -44,9 +45,9 @@ export function validateJiraAuthInputs(coreLib: typeof core): JiraAuthInputs {
   }
 
   return {
-    jiraUrl,
-    jiraUsername,
-    jiraApiToken
+    jiraUrl: stripTrailingSlash(jiraUrl),
+    jiraUsername: jiraUsername,
+    jiraApiToken: jiraApiToken,
   };
 }
 

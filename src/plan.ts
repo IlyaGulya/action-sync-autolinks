@@ -1,5 +1,5 @@
 import {AutolinkOp, GithubAutolink, JiraProject} from './types';
-import {jiraBrowseUrl, normalizeUrl, urlsEqual} from './utils/url';
+import {normalizeUrl, urlsEqual} from './utils/url';
 
 export interface PlanResult {
   operations: AutolinkOp[];
@@ -30,22 +30,22 @@ export function buildAutolinkPlan(
   // Plan operations for each JIRA project
   for (const project of jiraProjects) {
     const keyPrefix = `${project.key}-`;
-    const urlTemplate = jiraBrowseUrl(jiraUrl, project.key);
+    const urlTemplate = `${jiraUrl}/browse/${project.key}-<num>`;
     desiredPrefixes.add(keyPrefix);
 
     const existing = existingMap.get(keyPrefix);
     if (!existing) {
       operations.push({
         kind: 'create',
-        keyPrefix,
-        urlTemplate,
+        keyPrefix: keyPrefix,
+        urlTemplate: urlTemplate,
       });
     } else if (!urlsEqual(existing.url_template, urlTemplate)) {
       operations.push({
         kind: 'update',
         autolinkId: existing.id,
-        keyPrefix,
-        urlTemplate,
+        keyPrefix: keyPrefix,
+        urlTemplate: urlTemplate,
       });
     }
   }
@@ -56,7 +56,7 @@ export function buildAutolinkPlan(
       operations.push({
         kind: 'delete',
         autolinkId: autolink.id,
-        keyPrefix,
+        keyPrefix: keyPrefix,
       });
     }
   }

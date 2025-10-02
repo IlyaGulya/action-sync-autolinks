@@ -1,6 +1,5 @@
 import {JiraApiError, JiraProject, PageBeanProject, ProjectCategory} from './types';
 import {withRetry} from './retry';
-import {jiraApiUrl} from './utils/url';
 
 export interface JiraClient {
   get<T>(pathAndQuery: string, timeoutMs?: number): Promise<T>;
@@ -21,7 +20,7 @@ export function jiraClientFactory(
 
     try {
       const response = await withRetry(() =>
-        fetch(jiraApiUrl(jiraUrl, pathAndQuery), {
+        fetch(`${jiraUrl}${pathAndQuery.startsWith('/') ? '' : '/'}${pathAndQuery}`, {
           method: 'GET',
           headers: {
             'Authorization': `Basic ${auth}`,

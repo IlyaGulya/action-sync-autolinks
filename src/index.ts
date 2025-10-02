@@ -4,7 +4,6 @@ import {executeSyncAction} from './actions/sync';
 import {executeListCategoriesAction} from './actions/list-categories';
 import {jiraClientFactory} from './jira-client';
 import {validateJiraAuthInputs} from './inputs';
-import {stripTrailingSlash} from './utils/url';
 
 /**
  * Main entry point - delegates to the appropriate action based on the 'action' input
@@ -19,7 +18,7 @@ export async function run(deps: Dependencies = {}): Promise<void> {
     const jiraClient = injectedJiraClient ?? (() => {
       const jiraAuth = validateJiraAuthInputs(coreLib);
       return jiraClientFactory(
-        stripTrailingSlash(jiraAuth.jiraUrl),
+        jiraAuth.jiraUrl,
         jiraAuth.jiraUsername,
         jiraAuth.jiraApiToken,
       );
