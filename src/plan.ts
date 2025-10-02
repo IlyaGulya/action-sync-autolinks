@@ -1,26 +1,5 @@
-import { JiraProject, GithubAutolink } from './types';
-import { jiraBrowseUrl, urlsEqual, normalizeUrl } from './utils/url';
-
-export interface AutolinkOpCreate {
-  kind: 'create';
-  keyPrefix: string;
-  urlTemplate: string;
-}
-
-export interface AutolinkOpUpdate {
-  kind: 'update';
-  autolinkId: number;
-  keyPrefix: string;
-  urlTemplate: string;
-}
-
-export interface AutolinkOpDelete {
-  kind: 'delete';
-  autolinkId: number;
-  keyPrefix: string;
-}
-
-export type AutolinkOp = AutolinkOpCreate | AutolinkOpUpdate | AutolinkOpDelete;
+import {AutolinkOp, GithubAutolink, JiraProject} from './types';
+import {jiraBrowseUrl, normalizeUrl, urlsEqual} from './utils/url';
 
 export interface PlanResult {
   operations: AutolinkOp[];
@@ -32,13 +11,13 @@ export interface PlanResult {
 
 function isJiraAutolink(autolink: GithubAutolink, jiraUrl: string): boolean {
   return autolink.key_prefix.endsWith('-') &&
-         normalizeUrl(autolink.url_template).startsWith(`${normalizeUrl(jiraUrl)}/browse/`);
+    normalizeUrl(autolink.url_template).startsWith(`${normalizeUrl(jiraUrl)}/browse/`);
 }
 
 export function buildAutolinkPlan(
   jiraProjects: JiraProject[],
   existingAutolinks: GithubAutolink[],
-  jiraUrl: string
+  jiraUrl: string,
 ): PlanResult {
   const existingMap = new Map<string, GithubAutolink>();
   for (const autolink of existingAutolinks) {

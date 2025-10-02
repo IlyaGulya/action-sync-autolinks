@@ -47,3 +47,24 @@ export interface SyncDependencies {
   core?: typeof core;
   githubLib?: typeof github;
 }
+
+export interface AutolinkOpCreate {
+  kind: 'create';
+  keyPrefix: string;
+  urlTemplate: string;
+}
+
+export interface AutolinkOpUpdate {
+  kind: 'update';
+  autolinkId: number;
+  keyPrefix: string;
+  urlTemplate: string;
+}
+
+export interface AutolinkOpDelete {
+  kind: 'delete';
+  autolinkId: number;
+  keyPrefix: string;
+}
+
+export type AutolinkOp = AutolinkOpCreate | AutolinkOpUpdate | AutolinkOpDelete;

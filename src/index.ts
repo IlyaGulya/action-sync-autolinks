@@ -41,5 +41,5 @@ if (process.env.GITHUB_ACTIONS && process.env.NODE_ENV !== 'test') {
 export {getJiraProjects} from './jira';
 export {getExistingAutolinks, createAutolink, deleteAutolink} from './github';
 export {buildAutolinkPlan} from './plan';
-export type {AutolinkOp} from './plan';
+export type {AutolinkOp} from './types';
 export {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';

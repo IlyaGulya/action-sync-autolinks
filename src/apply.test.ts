@@ -1,7 +1,6 @@
-import { describe, test, expect } from 'bun:test';
-import { applyAutolinkPlan, applyAutolinkOp, applyAutolinkPlanDryRun } from './apply';
-import { useTestEnv } from './test-support';
-import { op } from './test-support';
+import {describe, expect, test} from 'bun:test';
+import {applyAutolinkOp, applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';
+import {op, useTestEnv} from './test-support';
 
 describe('applyAutolinkOp', () => {
   const env = useTestEnv();
@@ -10,10 +9,10 @@ describe('applyAutolinkOp', () => {
     const operation = op.create('TEST');
 
     env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
-      data: { id: 123, key_prefix: 'TEST-', url_template: operation.urlTemplate, is_alphanumeric: true },
+      data: {id: 123, key_prefix: 'TEST-', url_template: operation.urlTemplate, is_alphanumeric: true},
       status: 201,
       url: 'https://api.github.com/repos/test/test/autolinks',
-      headers: {}
+      headers: {},
     });
 
     await applyAutolinkOp(env.githubMocks.octokit, env.owner, env.repo, operation, env.mockCore);
@@ -23,9 +22,9 @@ describe('applyAutolinkOp', () => {
       repo: env.repo,
       key_prefix: 'TEST-',
       url_template: 'https://example.atlassian.net/browse/TEST-<num>',
-      is_alphanumeric: true
+      is_alphanumeric: true,
     });
-    expect(env.mockCore.info).toHaveBeenCalledWith('Creating autolink for TEST-');
+    expect(env.mockCore.info).toHaveBeenCalledWith('Creating autolink for TEST- -> https://example.atlassian.net/browse/TEST-<num>');
   });
 
   test('applies update operation', async () => {
@@ -34,13 +33,13 @@ describe('applyAutolinkOp', () => {
     env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue({
       status: 204,
       url: 'https://api.github.com/repos/test/test/autolinks/456',
-      headers: {}
+      headers: {},
     } as any);
     env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
-      data: { id: 789, key_prefix: 'UPDATE-', url_template: operation.urlTemplate, is_alphanumeric: true },
+      data: {id: 789, key_prefix: 'UPDATE-', url_template: operation.urlTemplate, is_alphanumeric: true},
       status: 201,
       url: 'https://api.github.com/repos/test/test/autolinks',
-      headers: {}
+      headers: {},
     });
 
     await applyAutolinkOp(env.githubMocks.octokit, env.owner, env.repo, operation, env.mockCore);
@@ -48,16 +47,16 @@ describe('applyAutolinkOp', () => {
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
       owner: env.owner,
       repo: env.repo,
-      autolink_id: 456
+      autolink_id: 456,
     });
     expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
       owner: env.owner,
       repo: env.repo,
       key_prefix: 'UPDATE-',
       url_template: 'https://new.atlassian.net/browse/UPDATE-<num>',
-      is_alphanumeric: true
+      is_alphanumeric: true,
     });
-    expect(env.mockCore.info).toHaveBeenCalledWith('Updating autolink for UPDATE-');
+    expect(env.mockCore.info).toHaveBeenCalledWith('Updating autolink 456 for UPDATE- -> https://new.atlassian.net/browse/UPDATE-<num>');
   });
 
   test('applies delete operation', async () => {
@@ -66,7 +65,7 @@ describe('applyAutolinkOp', () => {
     env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue({
       status: 204,
       url: 'https://api.github.com/repos/test/test/autolinks/789',
-      headers: {}
+      headers: {},
     } as any);
 
     await applyAutolinkOp(env.githubMocks.octokit, env.owner, env.repo, operation, env.mockCore);
@@ -74,9 +73,9 @@ describe('applyAutolinkOp', () => {
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
       owner: env.owner,
       repo: env.repo,
-      autolink_id: 789
+      autolink_id: 789,
     });
-    expect(env.mockCore.info).toHaveBeenCalledWith('Deleting obsolete autolink: OLD-');
+    expect(env.mockCore.info).toHaveBeenCalledWith('Deleting obsolete autolink 789 for OLD-');
   });
 });
 
@@ -86,19 +85,24 @@ describe('applyAutolinkPlan', () => {
   test('applies multiple operations successfully', async () => {
     const operations = [
       op.create('NEW'),
-      op.delete(123, 'OLD')
+      op.delete(123, 'OLD'),
     ];
 
     env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
-      data: { id: 1, key_prefix: 'NEW-', url_template: 'https://example.atlassian.net/browse/NEW-<num>', is_alphanumeric: true },
+      data: {
+        id: 1,
+        key_prefix: 'NEW-',
+        url_template: 'https://example.atlassian.net/browse/NEW-<num>',
+        is_alphanumeric: true,
+      },
       status: 201,
       url: 'https://api.github.com/repos/test/test/autolinks',
-      headers: {}
+      headers: {},
     });
     env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue({
       status: 204,
       url: 'https://api.github.com/repos/test/test/autolinks/123',
-      headers: {}
+      headers: {},
     } as any);
 
     const result = await applyAutolinkPlan(env.githubMocks.octokit, env.owner, env.repo, operations, env.mockCore);
@@ -111,7 +115,7 @@ describe('applyAutolinkPlan', () => {
   test('stops on error and rethrows', async () => {
     const operations = [
       op.create('NEW'),
-      op.delete(123, 'OLD')
+      op.delete(123, 'OLD'),
     ];
 
     env.githubMocks.octokit.rest.repos.createAutolink.mockRejectedValue(new Error('GitHub API error'));
@@ -131,7 +135,7 @@ describe('applyAutolinkPlanDryRun', () => {
     const operations = [
       op.create('NEW'),
       op.update(456, 'UPDATE', 'https://new.com/UPDATE-<num>'),
-      op.delete(123, 'OLD')
+      op.delete(123, 'OLD'),
     ];
 
     const result = applyAutolinkPlanDryRun(operations, env.mockCore);

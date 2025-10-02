@@ -1,5 +1,4 @@
-import { AutolinkOpCreate, AutolinkOpUpdate, AutolinkOpDelete } from '../plan';
-import { JiraProject, GithubAutolink } from '../types';
+import {AutolinkOpCreate, AutolinkOpDelete, AutolinkOpUpdate, GithubAutolink, JiraProject} from '../types';
 
 const JIRA_URL = 'https://example.atlassian.net';
 
@@ -7,31 +6,31 @@ export const op = {
   create: (key: string): AutolinkOpCreate => ({
     kind: 'create',
     keyPrefix: `${key}-`,
-    urlTemplate: `${JIRA_URL}/browse/${key}-<num>`
+    urlTemplate: `${JIRA_URL}/browse/${key}-<num>`,
   }),
 
   update: (id: number, key: string, url: string): AutolinkOpUpdate => ({
     kind: 'update',
     autolinkId: id,
     keyPrefix: `${key}-`,
-    urlTemplate: url
+    urlTemplate: url,
   }),
 
   delete: (id: number, key: string): AutolinkOpDelete => ({
     kind: 'delete',
     autolinkId: id,
-    keyPrefix: `${key}-`
-  })
+    keyPrefix: `${key}-`,
+  }),
 };
 
 export const jira = {
   project: (key: string, name = key, id = String(Math.floor(Math.random() * 1000))): JiraProject => ({
     key,
     name,
-    id
+    id,
   }),
 
-  projects: (keys: string[]): JiraProject[] => keys.map(key => jira.project(key))
+  projects: (keys: string[]): JiraProject[] => keys.map(key => jira.project(key)),
 };
 
 export const github = {
@@ -39,17 +38,17 @@ export const github = {
     id,
     key_prefix: `${key}-`,
     url_template: url,
-    is_alphanumeric: true
+    is_alphanumeric: true,
   } as GithubAutolink),
 
   autolinks: (data: Array<{ id: number; key: string; url: string }>): GithubAutolink[] =>
-    data.map(({ id, key, url }) => github.autolink(id, key, url))
+    data.map(({id, key, url}) => github.autolink(id, key, url)),
 };
 
 export const urls = {
   jira: JIRA_URL,
   jiraBrowse: (key: string) => `${JIRA_URL}/browse/${key}-<num>`,
-  other: 'https://other.example.com'
+  other: 'https://other.example.com',
 };
 
 // Common test data patterns
@@ -78,6 +77,6 @@ export const fixtures = {
       'jira-url': JIRA_URL,
       'jira-username': 'test-user',
       'jira-api-token': 'test-api-token',
-    }
-  }
+    },
+  },
 };
