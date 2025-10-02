@@ -31,7 +31,7 @@ export function mapJiraError(error: any): string {
     }
   } else if (error.name === 'AbortError') {
     return 'JIRA API request timed out. Please check your network connection or try again later.';
-  } else if (error.code) {
+  } else if (error.code && typeof error.code === 'string') {
     switch (error.code) {
       case 'ENOTFOUND':
         return 'Cannot resolve JIRA URL. Please check that the JIRA URL is correct and accessible.';

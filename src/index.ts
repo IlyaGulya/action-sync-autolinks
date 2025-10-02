@@ -29,7 +29,23 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
 
     // Fetch JIRA projects
     coreLib.info('Fetching JIRA projects...');
-    const jiraProjects = await getJiraProjects(inputs.jiraUrl, inputs.jiraUsername, inputs.jiraApiToken);
+    if (inputs.projectCategoryFilter) {
+      coreLib.info(`Filtering by categories: ${inputs.projectCategoryFilter.join(', ')}`);
+    }
+
+    let jiraProjects;
+    try {
+      jiraProjects = await getJiraProjects(
+        inputs.jiraUrl,
+        inputs.jiraUsername,
+        inputs.jiraApiToken,
+        inputs.projectCategoryFilter
+      );
+    } catch (error: any) {
+      coreLib.setFailed(mapJiraError(error));
+      return;
+    }
+
     coreLib.info(`Found ${jiraProjects.length} JIRA projects`);
 
     // Fetch existing autolinks
@@ -56,18 +72,17 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
 
   } catch (error: any) {
     const {core: coreLib = core} = deps;
-    // Check if it's a validation error (has newlines from our formatting)
-    // or use the JIRA error mapper for network/API errors
-    const errorMessage = error.response || error.code || error.name === 'AbortError'
-      ? mapJiraError(error)
-      : error.message;
-    coreLib.setFailed(errorMessage);
+    // Handle any unexpected errors (JIRA errors are handled above)
+    coreLib.setFailed(error.message || 'An unexpected error occurred');
   }
 }
 
 // Run the action
 if (require.main === module || (process.env.NODE_ENV !== 'test' && process.env.GITHUB_ACTIONS)) {
-  syncAutolinks();
+  syncAutolinks().catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
 }
 
 export {getJiraProjects} from './jira';

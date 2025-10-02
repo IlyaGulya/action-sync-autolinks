@@ -24,6 +24,9 @@ inputs:
     description: 'Run in dry-run mode (plan only, no changes)'
     required: false
     default: 'false'
+  project-category-ids:
+    description: 'Filter JIRA projects by category ID (optional, comma-separated for multiple)'
+    required: false
 
 outputs:
   projects-synced:

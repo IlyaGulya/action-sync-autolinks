@@ -18,6 +18,7 @@ describe('validateInputs', () => {
       jiraUrl: 'https://example.atlassian.net',
       jiraUsername: 'user@example.com',
       jiraApiToken: 'api-token',
+      projectCategoryFilter: undefined,
     });
   });
 
@@ -85,5 +86,61 @@ describe('validateInputs', () => {
     expect(mockExit).toHaveBeenCalledWith(1);
 
     mockExit.mockRestore();
+  });
+
+  test('parses project-category-ids from comma-separated string', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      'project-category-ids': 'cat1,cat2,cat3',
+    });
+
+    const result = validateInputs(mockCore);
+
+    expect(result.projectCategoryFilter).toEqual(['cat1', 'cat2', 'cat3']);
+  });
+
+  test('trims whitespace from category ID values', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      'project-category-ids': ' cat1 , cat2 ,  cat3  ',
+    });
+
+    const result = validateInputs(mockCore);
+
+    expect(result.projectCategoryFilter).toEqual(['cat1', 'cat2', 'cat3']);
+  });
+
+  test('filters out empty strings from category IDs', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      'project-category-ids': 'cat1,,cat2,  ,cat3',
+    });
+
+    const result = validateInputs(mockCore);
+
+    expect(result.projectCategoryFilter).toEqual(['cat1', 'cat2', 'cat3']);
+  });
+
+  test('returns undefined when project-category-ids is empty string', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      'project-category-ids': '',
+    });
+
+    const result = validateInputs(mockCore);
+
+    expect(result.projectCategoryFilter).toBeUndefined();
   });
 });

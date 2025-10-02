@@ -6,6 +6,21 @@ export interface JiraProject {
   key: string;
   name: string;
   id: string;
+  projectCategory?: {
+    id: string;
+    key: string;
+    name: string;
+  };
+}
+
+export interface PageBeanProject {
+  isLast?: boolean;
+  maxResults?: number;
+  nextPage?: string;
+  self?: string;
+  startAt?: number;
+  total?: number;
+  values: any[];
 }
 
 export interface JiraApiError extends Error {

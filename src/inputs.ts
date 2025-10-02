@@ -5,6 +5,7 @@ export interface ValidatedInputs {
   jiraUrl: string;
   jiraUsername: string;
   jiraApiToken: string;
+  projectCategoryFilter?: string[];
 }
 
 export function validateInputs(coreLib: typeof core): ValidatedInputs {
@@ -31,5 +32,11 @@ export function validateInputs(coreLib: typeof core): ValidatedInputs {
     process.exit(1);
   }
 
-  return { githubToken, jiraUrl, jiraUsername, jiraApiToken };
+  // Parse optional category IDs (comma-separated)
+  const categoryIdsInput = coreLib.getInput('project-category-ids');
+  const projectCategoryFilter = categoryIdsInput
+    ? categoryIdsInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
+    : undefined;
+
+  return { githubToken, jiraUrl, jiraUsername, jiraApiToken, projectCategoryFilter };
 }

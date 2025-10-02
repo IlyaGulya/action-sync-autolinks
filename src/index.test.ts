@@ -10,10 +10,13 @@ describe('syncAutolinks', () => {
   const env = useTestEnv({ inputs: fixtures.inputs.basic });
 
   test('creates, updates, deletes, sets outputs', async () => {
-    mockFetchJson(`${urls.jira}/rest/api/3/project`, [
-      { key: 'AAA', name: 'A', id: '1' },
-      { key: 'BBB', name: 'B', id: '2' }
-    ]);
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, {
+      isLast: true,
+      values: [
+        { key: 'AAA', name: 'A', id: '1' },
+        { key: 'BBB', name: 'B', id: '2' }
+      ]
+    });
 
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([
       github.autolink(10, 'AAA', urls.jiraBrowse('AAA')),
@@ -49,9 +52,12 @@ describe('syncAutolinks', () => {
   });
 
   test('creates new autolinks for new projects', async () => {
-    mockFetchJson(`${urls.jira}/rest/api/3/project`, [
-      jira.project('NEW', 'New Project', '1')
-    ]);
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, {
+      isLast: true,
+      values: [
+        jira.project('NEW', 'New Project', '1')
+      ]
+    });
 
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
     env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
@@ -76,9 +82,12 @@ describe('syncAutolinks', () => {
   });
 
   test('skips when autolink is up to date', async () => {
-    mockFetchJson(`${urls.jira}/rest/api/3/project`, [
-      jira.project('SAME', 'Same', '1')
-    ]);
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, {
+      isLast: true,
+      values: [
+        jira.project('SAME', 'Same', '1')
+      ]
+    });
 
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([
       github.autolink(10, 'SAME', urls.jiraBrowse('SAME'))
@@ -91,7 +100,7 @@ describe('syncAutolinks', () => {
   });
 
   test('handles failure and calls setFailed', async () => {
-    mockFetch(`${urls.jira}/rest/api/3/project`, () => {
+    mockFetch(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, () => {
       throw { code: 'ENOTFOUND', message: 'bad host' };
     });
 
@@ -110,7 +119,7 @@ describe('syncAutolinks', () => {
       message: 'teapot error'
     };
 
-    mockFetch(`${urls.jira}/rest/api/3/project`, () => {
+    mockFetch(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, () => {
       throw jiraError;
     });
 
@@ -125,12 +134,15 @@ describe('syncAutolinks', () => {
 
     try {
       let callCount = 0;
-      mockFetch(`${urls.jira}/rest/api/3/project`, () => {
+      mockFetch(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, () => {
         callCount++;
         if (callCount === 1) {
           throw { response: { status: 429, headers: { 'retry-after': '1' } } };
         }
-        return new Response(JSON.stringify([jira.project('RETRY', 'Retry Project', '1')]), {
+        return new Response(JSON.stringify({
+          isLast: true,
+          values: [jira.project('RETRY', 'Retry Project', '1')]
+        }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         });
@@ -169,7 +181,7 @@ describe('syncAutolinks with custom repository', () => {
   });
 
   test('uses repository input when provided', async () => {
-    mockFetchJson(`${urls.jira}/rest/api/3/project`, []);
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, { isLast: true, values: [] });
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
 
     await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
@@ -183,7 +195,10 @@ describe('syncAutolinks with dry-run', () => {
   const env = useTestEnv({ inputs: fixtures.inputs.dryRun });
 
   test('dry-run mode skips API calls and reports planned operations', async () => {
-    mockFetchJson(`${urls.jira}/rest/api/3/project`, jira.projects(['PLAN1', 'PLAN2']));
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, {
+      isLast: true,
+      values: jira.projects(['PLAN1', 'PLAN2'])
+    });
 
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([
       github.autolink(10, 'OLD', urls.jiraBrowse('OLD'))

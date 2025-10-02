@@ -31,11 +31,10 @@ export async function withRetry<T>(
       }
 
       // Check if error is retryable
-      const isRetryable = 
+      const isRetryable =
         (error.status && config.retryableStatusCodes.includes(error.status)) ||
         (error.response?.status && config.retryableStatusCodes.includes(error.response.status)) ||
-        error.code === 'ECONNRESET' ||
-        error.code === 'ETIMEDOUT';
+        (typeof error.code === 'string' && (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT'));
 
       if (!isRetryable) {
         break;
