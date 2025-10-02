@@ -40,7 +40,7 @@ export async function createAutolink(
         is_alphanumeric: true,
       })
     );
-    coreLib.info(`Created autolink for ${keyPrefix}: ${urlTemplate}`);
+    coreLib.debug?.(`Created autolink for ${keyPrefix}: ${urlTemplate}`);
     return response.data;
   } catch (error: any) {
     coreLib.error(`Failed to create autolink for ${keyPrefix}: ${error.message}`);
@@ -63,7 +63,7 @@ export async function deleteAutolink(
         autolink_id: autolinkId,
       })
     );
-    coreLib.info(`Deleted autolink with ID: ${autolinkId}`);
+    coreLib.debug?.(`Deleted autolink with ID: ${autolinkId}`);
   } catch (error: any) {
     coreLib.error(`Failed to delete autolink ${autolinkId}: ${error.message}`);
     throw error;
