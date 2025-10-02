@@ -1,19 +1,11 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { getJiraProjects } from './jira';
-import { mockFetchJson, clearFetchMocks } from './test-support';
-import {mockFetch} from "@aryzing/bun-mock-fetch";
+import { describe, test, expect } from 'bun:test';
+import { mockFetchJson, useTestEnv } from './test-support';
+import { mockFetch } from "@aryzing/bun-mock-fetch";
 
 const jiraUrl = 'https://example.atlassian.net';
-const username = 'u';
-const token = 't';
 
-describe('getJiraProjects', () => {
-  beforeEach(() => {
-  });
-
-  afterEach(() => {
-    clearFetchMocks();
-  });
+describe('JiraClient.getProjects', () => {
+  const env = useTestEnv();
 
   test('happy path maps and filters projects', async () => {
     mockFetchJson(`${jiraUrl}/rest/api/3/project/search?startAt=0&maxResults=100`, {
@@ -25,7 +17,7 @@ describe('getJiraProjects', () => {
       ]
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token);
+    const res = await env.jiraClient.getProjects();
     expect(res).toEqual([
       { key: 'AAA', name: 'Proj A', id: '1', projectCategory: undefined },
       { key: 'BBB', name: 'Proj B', id: '3', projectCategory: undefined }
@@ -34,7 +26,7 @@ describe('getJiraProjects', () => {
 
   test('invalid response format throws', async () => {
     mockFetchJson(`${jiraUrl}/rest/api/3/project/search?startAt=0&maxResults=100`, { foo: 'bar' });
-    expect(getJiraProjects(jiraUrl, username, token))
+    expect(env.jiraClient.getProjects())
       .rejects.toThrow('Invalid response format');
   });
 
@@ -44,7 +36,7 @@ describe('getJiraProjects', () => {
       statusText: 'Server Error',
       headers: { 'Content-Type': 'application/json' }
     }));
-    expect(getJiraProjects(jiraUrl, username, token))
+    expect(env.jiraClient.getProjects())
       .rejects.toThrow('HTTP 500: Server Error');
   });
 
@@ -57,7 +49,7 @@ describe('getJiraProjects', () => {
       ]
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token, ['10001']);
+    const res = await env.jiraClient.getProjects(['10001']);
     expect(res).toEqual([
       { key: 'AAA', name: 'Proj A', id: '1', projectCategory: { id: '10001', key: 'Category 1', name: 'Category 1' } },
       { key: 'CCC', name: 'Proj C', id: '3', projectCategory: { id: '10001', key: 'Category 1', name: 'Category 1' } }
@@ -73,7 +65,7 @@ describe('getJiraProjects', () => {
       ]
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token, ['10001', '10003']);
+    const res = await env.jiraClient.getProjects(['10001', '10003']);
     expect(res).toEqual([
       { key: 'AAA', name: 'Proj A', id: '1', projectCategory: { id: '10001', key: 'Category 1', name: 'Category 1' } },
       { key: 'CCC', name: 'Proj C', id: '3', projectCategory: { id: '10003', key: 'Category 3', name: 'Category 3' } }
@@ -86,7 +78,7 @@ describe('getJiraProjects', () => {
       values: []
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token, ['10003']);
+    const res = await env.jiraClient.getProjects(['10003']);
     expect(res).toEqual([]);
   });
 
@@ -99,7 +91,7 @@ describe('getJiraProjects', () => {
       ]
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token, []);
+    const res = await env.jiraClient.getProjects([]);
     expect(res).toEqual([
       { key: 'AAA', name: 'Proj A', id: '1', projectCategory: { id: '10001', key: 'Category 1', name: 'Category 1' } },
       { key: 'BBB', name: 'Proj B', id: '2', projectCategory: undefined }
@@ -122,7 +114,7 @@ describe('getJiraProjects', () => {
       ]
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token);
+    const res = await env.jiraClient.getProjects();
     expect(res).toEqual([
       { key: 'AAA', name: 'Proj A', id: '1', projectCategory: undefined },
       { key: 'BBB', name: 'Proj B', id: '2', projectCategory: undefined },
@@ -139,7 +131,7 @@ describe('getJiraProjects', () => {
       ]
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token, undefined, ['business', 'software']);
+    const res = await env.jiraClient.getProjects(undefined, ['business', 'software']);
     expect(res).toEqual([
       { key: 'BUS', name: 'Business Project', id: '1', projectCategory: undefined },
       { key: 'SW', name: 'Software Project', id: '2', projectCategory: undefined }
@@ -154,7 +146,7 @@ describe('getJiraProjects', () => {
       ]
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token, undefined, undefined, 'test');
+    const res = await env.jiraClient.getProjects(undefined, undefined, 'test');
     expect(res).toEqual([
       { key: 'TEST', name: 'Test Project', id: '1', projectCategory: undefined }
     ]);
@@ -168,7 +160,7 @@ describe('getJiraProjects', () => {
       ]
     });
 
-    const res = await getJiraProjects(jiraUrl, username, token, ['10000'], ['software'], 'api');
+    const res = await env.jiraClient.getProjects(['10000'], ['software'], 'api');
     expect(res).toEqual([
       { key: 'API', name: 'API Project', id: '1', projectCategory: { id: '10000', key: 'Engineering', name: 'Engineering' } }
     ]);

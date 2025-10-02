@@ -37,7 +37,7 @@ describe('executeSyncAction', () => {
       headers: {}
     });
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).toHaveBeenCalled();
     expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalled();
@@ -67,7 +67,7 @@ describe('executeSyncAction', () => {
       headers: {}
     });
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
       owner: env.owner,
@@ -93,7 +93,7 @@ describe('executeSyncAction', () => {
       github.autolink(10, 'SAME', urls.jiraBrowse('SAME'))
     ]);
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.githubMocks.octokit.rest.repos.createAutolink).not.toHaveBeenCalled();
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).not.toHaveBeenCalled();
@@ -104,7 +104,7 @@ describe('executeSyncAction', () => {
       throw { code: 'ENOTFOUND', message: 'bad host' };
     });
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining('Cannot resolve JIRA URL'));
   });
@@ -123,7 +123,7 @@ describe('executeSyncAction', () => {
       throw jiraError;
     });
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.mockCore.setFailed).toHaveBeenCalledWith('JIRA API error (418): teapot error');
   });
@@ -156,7 +156,7 @@ describe('executeSyncAction', () => {
         headers: {}
       });
 
-      await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+      await executeSyncAction(env.deps);
 
       expect(callCount).toBe(2);
       expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
@@ -184,7 +184,7 @@ describe('executeSyncAction with custom repository', () => {
     mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100`, { isLast: true, values: [] });
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.githubMocks.octokit.paginate)
       .toHaveBeenCalledWith(env.githubMocks.octokit.rest.repos.listAutolinks, { owner: 'altOwner', repo: 'altRepo', per_page: 100 });
@@ -204,7 +204,7 @@ describe('executeSyncAction with dry-run', () => {
       github.autolink(10, 'OLD', urls.jiraBrowse('OLD'))
     ]);
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.githubMocks.octokit.rest.repos.createAutolink).not.toHaveBeenCalled();
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).not.toHaveBeenCalled();
@@ -258,7 +258,7 @@ describe('executeSyncAction with 500 projects limit', () => {
       values: manyProjects.slice(500, 501)
     });
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.mockCore.setFailed).toHaveBeenCalledWith(
       expect.stringContaining('Found 501 JIRA projects, but GitHub only supports up to 500 autolinks')
@@ -309,7 +309,7 @@ describe('executeSyncAction with 500 projects limit', () => {
 
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.mockCore.setFailed).not.toHaveBeenCalledWith(
       expect.stringContaining('but GitHub only supports up to 500 autolinks')
@@ -343,7 +343,7 @@ describe('executeSyncAction with project filters', () => {
       headers: {}
     });
 
-    await executeSyncAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeSyncAction(env.deps);
 
     expect(env.mockCore.info).toHaveBeenCalledWith('Filtering by types: software');
     expect(env.mockCore.info).toHaveBeenCalledWith('Filtering by query: "api"');

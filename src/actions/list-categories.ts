@@ -1,25 +1,22 @@
 import * as core from '@actions/core';
-import {SyncDependencies} from '../types';
-import {getJiraProjectCategories} from '../jira-categories';
+import {Dependencies} from '../types';
 import {mapJiraError} from '../mapJiraError';
 import {validateListCategoriesInputs} from '../inputs';
 
-export async function executeListCategoriesAction(deps: SyncDependencies = {}): Promise<void> {
-  const {
-    core: coreLib = core,
-  } = deps;
-
+export async function executeListCategoriesAction({
+                                                    core: coreLib = core,
+                                                    jiraClient,
+                                                  }: Dependencies = {}): Promise<void> {
+  if (!jiraClient) {
+    throw new Error('jiraClient is required');
+  }
   const inputs = validateListCategoriesInputs(coreLib);
 
   coreLib.info('Running in list-categories mode');
   coreLib.info(`JIRA URL: ${inputs.jiraUrl}`);
 
   try {
-    const categories = await getJiraProjectCategories(
-      inputs.jiraUrl,
-      inputs.jiraUsername,
-      inputs.jiraApiToken
-    );
+    const categories = await jiraClient.getProjectCategories();
 
     coreLib.info(`\nFound ${categories.length} project categories:\n`);
     for (const category of categories) {

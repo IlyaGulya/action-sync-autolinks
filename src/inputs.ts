@@ -22,7 +22,7 @@ export interface ListCategoriesActionInputs extends JiraAuthInputs {}
 export interface ValidatedInputs extends SyncActionInputs {}
 
 // Helper: Validate JIRA authentication inputs
-function validateJiraAuthInputs(coreLib: typeof core): JiraAuthInputs {
+export function validateJiraAuthInputs(coreLib: typeof core): JiraAuthInputs {
   const validationErrors: string[] = [];
 
   const jiraUrl = coreLib.getInput('jira-url');

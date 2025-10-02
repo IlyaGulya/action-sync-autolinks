@@ -3,10 +3,15 @@ import { createMockCore } from './core';
 import { createGitHubMocks, GitHubMocks } from './octokit';
 import { clearFetchMocks } from './fetch';
 import type { DeepMock } from './mock-utils';
+import type { JiraClient } from '../jira-client';
+import { jiraClientFactory } from '../jira-client';
+import type { Dependencies } from '../types';
 
 export interface TestEnv {
   mockCore: DeepMock<typeof core>;
   githubMocks: GitHubMocks;
+  jiraClient: JiraClient;
+  deps: Dependencies;
   owner: string;
   repo: string;
   restore: () => void;
@@ -25,9 +30,24 @@ export function createTestEnv(options: TestEnvOptions = {}): TestEnv {
   const mockCore = createMockCore(options?.inputs ?? {});
   const githubMocks = createGitHubMocks(owner, repo);
 
+  // Create a real jiraClient that will use mocked fetch responses
+  const jiraClient = jiraClientFactory(
+    'https://example.atlassian.net',
+    'test-user',
+    'test-token'
+  );
+
+  const deps: Dependencies = {
+    core: mockCore,
+    githubLib: githubMocks.githubLib,
+    jiraClient,
+  };
+
   return {
     mockCore,
     githubMocks,
+    jiraClient,
+    deps,
     owner,
     repo,
     restore: () => {

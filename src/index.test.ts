@@ -15,7 +15,7 @@ describe('run (main entry point) - action delegation - sync', () => {
     });
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
 
-    await run({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await run(env.deps);
 
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Syncing autolinks'));
   });
@@ -29,7 +29,7 @@ describe('run (main entry point) - action delegation - list-categories', () => {
       { id: '10000', name: 'FIRST', description: 'First Category' }
     ]);
 
-    await run({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await run(env.deps);
 
     expect(env.mockCore.info).toHaveBeenCalledWith('Running in list-categories mode');
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Found 1 project categories'));
@@ -51,7 +51,7 @@ describe('run (main entry point) - action delegation - defaults', () => {
     });
     env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
 
-    await run({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await run(env.deps);
 
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Syncing autolinks'));
   });
@@ -66,7 +66,7 @@ describe('run (main entry point) - action delegation - invalid action', () => {
   });
 
   test('handles invalid action input', async () => {
-    await run({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await run(env.deps);
 
     expect(env.mockCore.setFailed).toHaveBeenCalledWith('Invalid action: invalid-action. Valid actions are: sync, list-categories');
   });
@@ -81,7 +81,7 @@ describe('run (main entry point) - error handling', () => {
       throw new Error('Network failure');
     });
 
-    await run({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await run(env.deps);
 
     // The error should be caught in the action's own error handling
     expect(env.mockCore.setFailed).toHaveBeenCalled();

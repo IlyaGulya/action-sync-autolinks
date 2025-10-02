@@ -16,7 +16,7 @@ describe('executeListCategoriesAction', () => {
       { id: '10001', name: 'SECOND', description: 'Second Project Category', self: 'https://example.atlassian.net/rest/api/3/projectCategory/10001' }
     ]);
 
-    await executeListCategoriesAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeListCategoriesAction(env.deps);
 
     expect(env.mockCore.info).toHaveBeenCalledWith('Running in list-categories mode');
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Found 2 project categories'));
@@ -34,7 +34,7 @@ describe('executeListCategoriesAction', () => {
       throw { code: 'ENOTFOUND', message: 'bad host' };
     });
 
-    await executeListCategoriesAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeListCategoriesAction(env.deps);
 
     expect(env.mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining('Cannot resolve JIRA URL'));
   });
@@ -45,7 +45,7 @@ describe('executeListCategoriesAction', () => {
       { id: '10001', name: 'Category B', description: 'Description B' }
     ]);
 
-    await executeListCategoriesAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeListCategoriesAction(env.deps);
 
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Description A'));
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Description B'));
@@ -57,7 +57,7 @@ describe('executeListCategoriesAction', () => {
       { id: '10001', name: 'Category B' }
     ]);
 
-    await executeListCategoriesAction({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+    await executeListCategoriesAction(env.deps);
 
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('ID: 10000, Name: Category A'));
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('ID: 10001, Name: Category B'));

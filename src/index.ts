@@ -1,24 +1,42 @@
 import * as core from '@actions/core';
-import {SyncDependencies} from './types';
+import {Dependencies} from './types';
 import {executeSyncAction} from './actions/sync';
 import {executeListCategoriesAction} from './actions/list-categories';
+import {jiraClientFactory} from './jira-client';
+import {validateJiraAuthInputs} from './inputs';
+import {stripTrailingSlash} from './utils/url';
 
 /**
  * Main entry point - delegates to the appropriate action based on the 'action' input
  */
-export async function run(deps: SyncDependencies = {}): Promise<void> {
+export async function run(deps: Dependencies = {}): Promise<void> {
   try {
-    const {core: coreLib = core} = deps;
+    const {core: coreLib = core, jiraClient: injectedJiraClient} = deps;
 
     const actionInput = coreLib.getInput('action') || 'sync';
 
+    // Create JIRA client if not injected (for testing)
+    const jiraClient = injectedJiraClient ?? (() => {
+      const jiraAuth = validateJiraAuthInputs(coreLib);
+      return jiraClientFactory(
+        stripTrailingSlash(jiraAuth.jiraUrl),
+        jiraAuth.jiraUsername,
+        jiraAuth.jiraApiToken,
+      );
+    })();
+
+    const depsWithClient: Dependencies = {
+      ...deps,
+      jiraClient,
+    };
+
     switch (actionInput) {
       case 'sync':
-        await executeSyncAction(deps);
+        await executeSyncAction(depsWithClient);
         break;
 
       case 'list-categories':
-        await executeListCategoriesAction(deps);
+        await executeListCategoriesAction(depsWithClient);
         break;
 
       default:
@@ -38,7 +56,8 @@ if (process.env.GITHUB_ACTIONS && process.env.NODE_ENV !== 'test') {
   });
 }
 
-export {getJiraProjects} from './jira';
+export {jiraClientFactory} from './jira-client';
+export type {JiraClient} from './jira-client';
 export {getExistingAutolinks, createAutolink, deleteAutolink} from './github';
 export {buildAutolinkPlan} from './plan';
 export type {AutolinkOp} from './types';

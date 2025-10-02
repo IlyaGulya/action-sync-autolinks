@@ -1,19 +1,20 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import {SyncDependencies} from '../types';
-import {getJiraProjects} from '../jira';
+import {Dependencies} from '../types';
 import {getExistingAutolinks} from '../github';
 import {buildAutolinkPlan} from '../plan';
 import {applyAutolinkPlan, applyAutolinkPlanDryRun} from '../apply';
 import {mapJiraError} from '../mapJiraError';
 import {validateSyncInputs} from '../inputs';
 
-export async function executeSyncAction(deps: SyncDependencies = {}): Promise<void> {
-  const {
-    core: coreLib = core,
-    githubLib = github,
-  } = deps;
-
+export async function executeSyncAction({
+                                          core: coreLib = core,
+                                          githubLib = github,
+                                          jiraClient,
+                                        }: Dependencies = {}): Promise<void> {
+  if (!jiraClient) {
+    throw new Error('jiraClient is required');
+  }
   const inputs = validateSyncInputs(coreLib);
 
   let currentRepo = githubLib.context.repo;
@@ -40,13 +41,10 @@ export async function executeSyncAction(deps: SyncDependencies = {}): Promise<vo
 
   let jiraProjects;
   try {
-    jiraProjects = await getJiraProjects(
-      inputs.jiraUrl,
-      inputs.jiraUsername,
-      inputs.jiraApiToken,
+    jiraProjects = await jiraClient.getProjects(
       inputs.projectCategoryFilter,
       inputs.projectTypeFilter,
-      inputs.projectQuery
+      inputs.projectQuery,
     );
   } catch (error: any) {
     coreLib.setFailed(mapJiraError(error));
@@ -62,7 +60,7 @@ export async function executeSyncAction(deps: SyncDependencies = {}): Promise<vo
       `Please use filtering inputs to reduce the number of projects:\n` +
       `  - 'filter-project-category-ids': Filter by category (use 'action: list-categories' to see available categories)\n` +
       `  - 'filter-project-type': Filter by type (business, service_desk, software)\n` +
-      `  - 'filter-project-query': Filter by project key or name`
+      `  - 'filter-project-query': Filter by project key or name`,
     );
     return;
   }

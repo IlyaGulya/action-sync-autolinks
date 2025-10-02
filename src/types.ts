@@ -1,6 +1,7 @@
 import type * as core from '@actions/core';
 import type * as github from '@actions/github';
 import type { Endpoints } from '@octokit/types';
+import type { JiraClient } from './jira-client';
 
 export interface JiraProject {
   key: string;
@@ -43,9 +44,10 @@ export type GithubAutolink = Endpoints['GET /repos/{owner}/{repo}/autolinks']['r
 
 export type Octokit = ReturnType<typeof github.getOctokit>;
 
-export interface SyncDependencies {
+export interface Dependencies {
   core?: typeof core;
   githubLib?: typeof github;
+  jiraClient?: JiraClient;
 }
 
 export interface AutolinkOpCreate {
