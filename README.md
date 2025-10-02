@@ -35,8 +35,8 @@ jobs:
       - uses: IlyaGulya/action-sync-autolinks@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          jira-url: ${{ secrets.JIRA_URL }}
-          jira-username: ${{ secrets.JIRA_USERNAME }}
+          jira-url: ${{ vars.JIRA_URL }}
+          jira-username: ${{ vars.JIRA_USERNAME }}
           jira-api-token: ${{ secrets.JIRA_API_TOKEN }}
 ```
 
@@ -47,8 +47,8 @@ jobs:
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     jira-url: ${{ secrets.JIRA_URL }}
-    jira-username: ${{ secrets.JIRA_USERNAME }}
-    jira-api-token: ${{ secrets.JIRA_API_TOKEN }}
+    jira-username: ${{ vars.JIRA_USERNAME }}
+    jira-api-token: ${{ vars.JIRA_API_TOKEN }}
     repository: 'owner/repo'  # Optional: specify different repo
 ```
 
