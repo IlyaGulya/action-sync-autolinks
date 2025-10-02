@@ -41,14 +41,24 @@ export async function withRetry<T>(
         break;
       }
 
-      // Calculate delay with exponential backoff
-      const delay = Math.min(
-        config.baseDelay * Math.pow(2, attempt - 1),
-        config.maxDelay
-      );
+      // Check for Retry-After header
+      const retryAfter = error.response?.headers?.['retry-after'];
+      const retryAfterSeconds = retryAfter ? Number(retryAfter) : NaN;
 
-      // Add jitter (±25%)
-      const jitter = delay * 0.25 * (Math.random() * 2 - 1);
+      let delay: number;
+      if (Number.isFinite(retryAfterSeconds)) {
+        // Use Retry-After value (in seconds)
+        delay = Math.min(retryAfterSeconds * 1000, config.maxDelay);
+      } else {
+        // Calculate delay with exponential backoff
+        delay = Math.min(
+          config.baseDelay * Math.pow(2, attempt - 1),
+          config.maxDelay
+        );
+      }
+
+      // Add jitter (±25%) only for exponential backoff
+      const jitter = Number.isFinite(retryAfterSeconds) ? 0 : delay * 0.25 * (Math.random() * 2 - 1);
       const finalDelay = Math.max(0, delay + jitter);
 
       await new Promise(resolve => setTimeout(resolve, finalDelay));
