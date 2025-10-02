@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { getExistingAutolinks, createAutolink, deleteAutolink } from './github';
-import { useTestEnv } from './test-support/use-test-env';
+import { useTestEnv } from './test-support';
 
 describe('GitHub helper functions', () => {
   const env = useTestEnv();

@@ -1,5 +1,5 @@
 name: 'JIRA Autolinks Sync'
-description: 'Sync JIRA queues with GitHub repository autolinks'
+description: 'Sync JIRA projects with GitHub repository autolinks'
 author: 'IlyaGulya'
 
 inputs:

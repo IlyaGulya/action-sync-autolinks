@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { getJiraQueues } from './jira';
+import { getJiraProjects } from './jira';
 import { mockFetchJson, clearFetchMocks } from './test-support';
 import {mockFetch} from "@aryzing/bun-mock-fetch";
 
@@ -7,7 +7,7 @@ const jiraUrl = 'https://example.atlassian.net';
 const username = 'u';
 const token = 't';
 
-describe('getJiraQueues', () => {
+describe('getJiraProjects', () => {
   beforeEach(() => {
   });
 
@@ -22,7 +22,7 @@ describe('getJiraQueues', () => {
       { key: 'BBB', name: 'Proj B', id: '3' }
     ]);
 
-    const res = await getJiraQueues(jiraUrl, username, token);
+    const res = await getJiraProjects(jiraUrl, username, token);
     expect(res).toEqual([
       { key: 'AAA', name: 'Proj A', id: '1' },
       { key: 'BBB', name: 'Proj B', id: '3' }
@@ -31,7 +31,7 @@ describe('getJiraQueues', () => {
 
   test('invalid response format throws', async () => {
     mockFetchJson(`${jiraUrl}/rest/api/3/project`, { foo: 'bar' });
-    expect(getJiraQueues(jiraUrl, username, token))
+    expect(getJiraProjects(jiraUrl, username, token))
       .rejects.toThrow('Invalid response format');
   });
 
@@ -41,7 +41,7 @@ describe('getJiraQueues', () => {
       statusText: 'Server Error',
       headers: { 'Content-Type': 'application/json' }
     }));
-    expect(getJiraQueues(jiraUrl, username, token))
+    expect(getJiraProjects(jiraUrl, username, token))
       .rejects.toThrow('HTTP 500: Server Error');
   });
 });

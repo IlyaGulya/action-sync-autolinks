@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import {SyncDependencies} from './types';
-import {getJiraQueues} from './jira';
+import {getJiraProjects} from './jira';
 import {getExistingAutolinks} from './github';
 import {buildAutolinkPlan} from './plan';
 import {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';
@@ -29,9 +29,9 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
     coreLib.info(`Syncing autolinks for ${repository}`);
     coreLib.info(`JIRA URL: ${jiraUrl}`);
 
-    // Fetch JIRA queues/projects
+    // Fetch JIRA projects
     coreLib.info('Fetching JIRA projects...');
-    const jiraProjects = await getJiraQueues(jiraUrl, jiraUsername, jiraApiToken);
+    const jiraProjects = await getJiraProjects(jiraUrl, jiraUsername, jiraApiToken);
     coreLib.info(`Found ${jiraProjects.length} JIRA projects`);
 
     // Fetch existing autolinks
@@ -69,7 +69,7 @@ if (require.main === module || (process.env.NODE_ENV !== 'test' && process.env.G
   syncAutolinks();
 }
 
-export {getJiraQueues} from './jira';
+export {getJiraProjects} from './jira';
 export {getExistingAutolinks, createAutolink, deleteAutolink} from './github';
 export {buildAutolinkPlan} from './plan';
 export type {AutolinkOp} from './plan';

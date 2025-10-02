@@ -1,14 +1,14 @@
 import {JiraApiError, JiraProject} from './types';
 import {withRetry} from './retry';
 
-export async function getJiraQueues(
+export async function getJiraProjects(
   jiraUrl: string,
   username: string,
   apiToken: string,
 ): Promise<JiraProject[]> {
   const auth = Buffer.from(`${username}:${apiToken}`).toString('base64');
 
-  // Get all projects (which contain queues/issues)
+  // Get all projects from JIRA
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
