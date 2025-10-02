@@ -1,8 +1,6 @@
 import type * as core from '@actions/core';
 import type * as github from '@actions/github';
-import type {
-  RestEndpointMethodTypes,
-} from "@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
+import type { Endpoints } from '@octokit/types';
 
 export interface JiraProject {
   key: string;
@@ -19,7 +17,7 @@ export interface JiraApiError extends Error {
   code?: string;
 }
 
-export type GithubAutolink = RestEndpointMethodTypes["repos"]["listAutolinks"]["response"]["data"][number]
+export type GithubAutolink = Endpoints['GET /repos/{owner}/{repo}/autolinks']['response']['data'][number];
 
 export type Octokit = ReturnType<typeof github.getOctokit>;
 
