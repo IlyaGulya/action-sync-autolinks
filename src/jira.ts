@@ -1,5 +1,6 @@
 import {JiraApiError, JiraProject, PageBeanProject} from './types';
 import {withRetry} from './retry';
+import {jiraApiUrl, stripTrailingSlash} from './utils/url';
 
 export async function getJiraProjects(
   jiraUrl: string,
@@ -43,7 +44,8 @@ export async function getJiraProjects(
       queryParams.append('query', query);
     }
 
-    const url = `${jiraUrl}/rest/api/3/project/search?${queryParams.toString()}`;
+    const base = stripTrailingSlash(jiraUrl);
+    const url = jiraApiUrl(base, `/rest/api/3/project/search?${queryParams.toString()}`);
 
     const response = await withRetry(() =>
       fetch(url, {

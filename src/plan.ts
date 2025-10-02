@@ -1,4 +1,5 @@
 import { JiraProject, GithubAutolink } from './types';
+import { jiraBrowseUrl, urlsEqual, normalizeUrl } from './utils/url';
 
 export interface AutolinkOpCreate {
   kind: 'create';
@@ -29,17 +30,9 @@ export interface PlanResult {
   };
 }
 
-function normalizeUrl(url: string): string {
-  return url.toLowerCase().replace(/\/$/, '');
-}
-
-function urlsEqual(a: string, b: string): boolean {
-  return normalizeUrl(a) === normalizeUrl(b);
-}
-
 function isJiraAutolink(autolink: GithubAutolink, jiraUrl: string): boolean {
-  return autolink.key_prefix.endsWith('-') && 
-         normalizeUrl(autolink.url_template).startsWith(normalizeUrl(jiraUrl) + '/browse/');
+  return autolink.key_prefix.endsWith('-') &&
+         normalizeUrl(autolink.url_template).startsWith(`${normalizeUrl(jiraUrl)}/browse/`);
 }
 
 export function buildAutolinkPlan(
@@ -58,7 +51,7 @@ export function buildAutolinkPlan(
   // Plan operations for each JIRA project
   for (const project of jiraProjects) {
     const keyPrefix = `${project.key}-`;
-    const urlTemplate = `${jiraUrl}/browse/${project.key}-<num>`;
+    const urlTemplate = jiraBrowseUrl(jiraUrl, project.key);
     desiredPrefixes.add(keyPrefix);
 
     const existing = existingMap.get(keyPrefix);

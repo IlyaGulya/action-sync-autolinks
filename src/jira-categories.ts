@@ -1,5 +1,6 @@
 import {JiraApiError, ProjectCategory} from './types';
 import {withRetry} from './retry';
+import {jiraApiUrl, stripTrailingSlash} from './utils/url';
 
 export async function getJiraProjectCategories(
   jiraUrl: string,
@@ -11,7 +12,8 @@ export async function getJiraProjectCategories(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-  const url = `${jiraUrl}/rest/api/3/projectCategory`;
+  const base = stripTrailingSlash(jiraUrl);
+  const url = jiraApiUrl(base, '/rest/api/3/projectCategory');
 
   const response = await withRetry(() =>
     fetch(url, {
