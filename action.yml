@@ -24,8 +24,14 @@ inputs:
     description: 'Run in dry-run mode (plan only, no changes)'
     required: false
     default: 'false'
-  project-category-ids:
+  filter-project-category-ids:
     description: 'Filter JIRA projects by category ID (optional, comma-separated for multiple)'
+    required: false
+  filter-project-type:
+    description: 'Filter JIRA projects by type (optional, comma-separated: business, service_desk, software)'
+    required: false
+  filter-project-query:
+    description: 'Filter JIRA projects by literal string matching project key or name (case insensitive)'
     required: false
   list-categories:
     description: 'List all available JIRA project categories and exit (no sync performed)'

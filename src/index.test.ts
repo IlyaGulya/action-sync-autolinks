@@ -264,10 +264,13 @@ describe('syncAutolinks with 500 projects limit', () => {
       expect.stringContaining('Found 501 JIRA projects, but GitHub only supports up to 500 autolinks')
     );
     expect(env.mockCore.setFailed).toHaveBeenCalledWith(
-      expect.stringContaining('project-category-ids')
+      expect.stringContaining('filter-project-category-ids')
     );
     expect(env.mockCore.setFailed).toHaveBeenCalledWith(
-      expect.stringContaining('list-categories: true')
+      expect.stringContaining('filter-project-type')
+    );
+    expect(env.mockCore.setFailed).toHaveBeenCalledWith(
+      expect.stringContaining('filter-project-query')
     );
   });
 
@@ -335,7 +338,7 @@ describe('syncAutolinks with list-categories mode', () => {
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Found 2 project categories'));
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('ID: 10000, Name: FIRST'));
     expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('ID: 10001, Name: SECOND'));
-    expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('project-category-ids'));
+    expect(env.mockCore.info).toHaveBeenCalledWith(expect.stringContaining('filter-project-category-ids'));
 
     // Should not perform any sync operations
     expect(env.githubMocks.octokit.paginate).not.toHaveBeenCalled();
@@ -350,5 +353,38 @@ describe('syncAutolinks with list-categories mode', () => {
     await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
 
     expect(env.mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining('Cannot resolve JIRA URL'));
+  });
+});
+
+describe('syncAutolinks with project filters', () => {
+  const env = useTestEnv({
+    inputs: {
+      ...fixtures.inputs.basic,
+      'filter-project-type': 'software',
+      'filter-project-query': 'api'
+    }
+  });
+
+  test('applies type and query filters', async () => {
+    mockFetchJson(`${urls.jira}/rest/api/3/project/search?startAt=0&maxResults=100&typeKey=software&query=api`, {
+      isLast: true,
+      values: [
+        { key: 'API', name: 'API Gateway', id: '1' }
+      ]
+    });
+
+    env.githubMocks.octokit.paginate.mockResolvedValueOnce([]);
+    env.githubMocks.octokit.rest.repos.createAutolink.mockResolvedValue({
+      data: { id: 1, key_prefix: 'API-', url_template: 'https://example.atlassian.net/browse/API-<num>', is_alphanumeric: true },
+      status: 201,
+      url: 'https://api.github.com/repos/test/test/autolinks',
+      headers: {}
+    });
+
+    await syncAutolinks({ core: env.mockCore, githubLib: env.githubMocks.githubLib });
+
+    expect(env.mockCore.info).toHaveBeenCalledWith('Filtering by types: software');
+    expect(env.mockCore.info).toHaveBeenCalledWith('Filtering by query: "api"');
+    expect(env.mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 1);
   });
 });

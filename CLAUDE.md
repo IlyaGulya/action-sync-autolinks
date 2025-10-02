@@ -9,7 +9,6 @@ This is a GitHub Action that automatically synchronizes JIRA projects with GitHu
 ## Development Commands
 
 - **Test**: `bun test` - Run all tests
-- **Build**: `bun build src/index.ts --outdir dist --target node --minify` - Build the distribution bundle
 - **Type Check**: `bun typecheck` - Run TypeScript type checking
 
 ## Architecture

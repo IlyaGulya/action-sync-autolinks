@@ -6,6 +6,8 @@ export async function getJiraProjects(
   username: string,
   apiToken: string,
   categoryFilter?: string[],
+  typeFilter?: string[],
+  query?: string,
 ): Promise<JiraProject[]> {
   const auth = Buffer.from(`${username}:${apiToken}`).toString('base64');
   const allProjects: JiraProject[] = [];
@@ -29,6 +31,16 @@ export async function getJiraProjects(
       categoryFilter.forEach(categoryId => {
         queryParams.append('categoryId', categoryId);
       });
+    }
+
+    // Add type filter if provided (server-side filtering)
+    if (typeFilter && typeFilter.length > 0) {
+      queryParams.append('typeKey', typeFilter.join(','));
+    }
+
+    // Add query filter if provided (server-side filtering)
+    if (query) {
+      queryParams.append('query', query);
     }
 
     const url = `${jiraUrl}/rest/api/3/project/search?${queryParams.toString()}`;

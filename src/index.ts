@@ -45,8 +45,8 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
           coreLib.info(`  ID: ${category.id}, Name: ${category.name}${description}`);
         }
 
-        coreLib.info('\nTo filter projects by category, use the project-category-ids input:');
-        coreLib.info('  project-category-ids: \'10000,10001\'');
+        coreLib.info('\nTo filter projects by category, use the filter-project-category-ids input:');
+        coreLib.info('  filter-project-category-ids: \'10000,10001\'');
 
         return;
       } catch (error: any) {
@@ -63,6 +63,12 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
     if (inputs.projectCategoryFilter) {
       coreLib.info(`Filtering by categories: ${inputs.projectCategoryFilter.join(', ')}`);
     }
+    if (inputs.projectTypeFilter) {
+      coreLib.info(`Filtering by types: ${inputs.projectTypeFilter.join(', ')}`);
+    }
+    if (inputs.projectQuery) {
+      coreLib.info(`Filtering by query: "${inputs.projectQuery}"`);
+    }
 
     let jiraProjects;
     try {
@@ -70,7 +76,9 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
         inputs.jiraUrl,
         inputs.jiraUsername,
         inputs.jiraApiToken,
-        inputs.projectCategoryFilter
+        inputs.projectCategoryFilter,
+        inputs.projectTypeFilter,
+        inputs.projectQuery
       );
     } catch (error: any) {
       coreLib.setFailed(mapJiraError(error));
@@ -83,8 +91,10 @@ export async function syncAutolinks(deps: SyncDependencies = {}): Promise<void> 
     if (jiraProjects.length > 500) {
       coreLib.setFailed(
         `Found ${jiraProjects.length} JIRA projects, but GitHub only supports up to 500 autolinks per repository.\n` +
-        `Please use the 'project-category-ids' input to filter projects by category.\n` +
-        `Run with 'list-categories: true' to see available categories and their IDs.`
+        `Please use filtering inputs to reduce the number of projects:\n` +
+        `  - 'filter-project-category-ids': Filter by category (use 'list-categories: true' to see available categories)\n` +
+        `  - 'filter-project-type': Filter by type (business, service_desk, software)\n` +
+        `  - 'filter-project-query': Filter by project key or name`
       );
       return;
     }

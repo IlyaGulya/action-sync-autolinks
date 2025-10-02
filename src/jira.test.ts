@@ -129,4 +129,48 @@ describe('getJiraProjects', () => {
       { key: 'CCC', name: 'Proj C', id: '3', projectCategory: undefined }
     ]);
   });
+
+  test('filters projects by type when typeFilter is provided', async () => {
+    mockFetchJson(`${jiraUrl}/rest/api/3/project/search?startAt=0&maxResults=100&typeKey=business%2Csoftware`, {
+      isLast: true,
+      values: [
+        { key: 'BUS', name: 'Business Project', id: '1' },
+        { key: 'SW', name: 'Software Project', id: '2' }
+      ]
+    });
+
+    const res = await getJiraProjects(jiraUrl, username, token, undefined, ['business', 'software']);
+    expect(res).toEqual([
+      { key: 'BUS', name: 'Business Project', id: '1', projectCategory: undefined },
+      { key: 'SW', name: 'Software Project', id: '2', projectCategory: undefined }
+    ]);
+  });
+
+  test('filters projects by query when query is provided', async () => {
+    mockFetchJson(`${jiraUrl}/rest/api/3/project/search?startAt=0&maxResults=100&query=test`, {
+      isLast: true,
+      values: [
+        { key: 'TEST', name: 'Test Project', id: '1' }
+      ]
+    });
+
+    const res = await getJiraProjects(jiraUrl, username, token, undefined, undefined, 'test');
+    expect(res).toEqual([
+      { key: 'TEST', name: 'Test Project', id: '1', projectCategory: undefined }
+    ]);
+  });
+
+  test('combines category, type, and query filters', async () => {
+    mockFetchJson(`${jiraUrl}/rest/api/3/project/search?startAt=0&maxResults=100&categoryId=10000&typeKey=software&query=api`, {
+      isLast: true,
+      values: [
+        { key: 'API', name: 'API Project', id: '1', projectCategory: { id: '10000', name: 'Engineering' } }
+      ]
+    });
+
+    const res = await getJiraProjects(jiraUrl, username, token, ['10000'], ['software'], 'api');
+    expect(res).toEqual([
+      { key: 'API', name: 'API Project', id: '1', projectCategory: { id: '10000', key: 'Engineering', name: 'Engineering' } }
+    ]);
+  });
 });

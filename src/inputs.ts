@@ -6,6 +6,8 @@ export interface ValidatedInputs {
   jiraUsername: string;
   jiraApiToken: string;
   projectCategoryFilter?: string[];
+  projectTypeFilter?: string[];
+  projectQuery?: string;
 }
 
 export function validateInputs(coreLib: typeof core): ValidatedInputs {
@@ -33,10 +35,40 @@ export function validateInputs(coreLib: typeof core): ValidatedInputs {
   }
 
   // Parse optional category IDs (comma-separated)
-  const categoryIdsInput = coreLib.getInput('project-category-ids');
+  const categoryIdsInput = coreLib.getInput('filter-project-category-ids');
   const projectCategoryFilter = categoryIdsInput
     ? categoryIdsInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
     : undefined;
 
-  return { githubToken, jiraUrl, jiraUsername, jiraApiToken, projectCategoryFilter };
+  // Parse optional project types (comma-separated)
+  const VALID_PROJECT_TYPES = ['business', 'service_desk', 'software'];
+  const projectTypeInput = coreLib.getInput('filter-project-type');
+  let projectTypeFilter: string[] | undefined = undefined;
+
+  if (projectTypeInput) {
+    const types = projectTypeInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    const invalidTypes = types.filter(t => !VALID_PROJECT_TYPES.includes(t));
+
+    if (invalidTypes.length > 0) {
+      coreLib.error(`Invalid project types: ${invalidTypes.join(', ')}`);
+      coreLib.error(`Valid types are: ${VALID_PROJECT_TYPES.join(', ')}`);
+      coreLib.setFailed('Input validation failed');
+      process.exit(1);
+    }
+
+    projectTypeFilter = types.length > 0 ? types : undefined;
+  }
+
+  // Parse optional project query (single string)
+  const projectQuery = coreLib.getInput('filter-project-query') || undefined;
+
+  return {
+    githubToken,
+    jiraUrl,
+    jiraUsername,
+    jiraApiToken,
+    projectCategoryFilter,
+    projectTypeFilter,
+    projectQuery
+  };
 }
