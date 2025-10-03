@@ -133,4 +133,30 @@ describe('buildAutolinkPlan', () => {
     expect(plan.metrics.projectsSynced).toBe(3);
     expect(plan.metrics.operationsPlanned).toBe(3);
   });
+
+  test('operations are ordered: deletes first, then updates, then creates', () => {
+    const jiraProjects = jira.projects(['NEW1', 'UPDATE1', 'NEW2', 'UPDATE2']);
+    const existingAutolinks = github.autolinks([
+      { id: 11, key: 'UPDATE1', url: 'https://old.atlassian.net/browse/UPDATE1-<num>' },
+      { id: 12, key: 'OLD1', url: urls.jiraBrowse('OLD1') },
+      { id: 13, key: 'OLD2', url: urls.jiraBrowse('OLD2') },
+      { id: 14, key: 'UPDATE2', url: 'https://old.atlassian.net/browse/UPDATE2-<num>' }
+    ]);
+
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
+
+    expect(plan.operations).toHaveLength(6);
+
+    // Verify all deletes come first
+    expect(plan.operations[0].kind).toBe('delete');
+    expect(plan.operations[1].kind).toBe('delete');
+
+    // Verify all updates come next
+    expect(plan.operations[2].kind).toBe('update');
+    expect(plan.operations[3].kind).toBe('update');
+
+    // Verify all creates come last
+    expect(plan.operations[4].kind).toBe('create');
+    expect(plan.operations[5].kind).toBe('create');
+  });
 });

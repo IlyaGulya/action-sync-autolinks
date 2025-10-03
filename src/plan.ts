@@ -61,6 +61,12 @@ export function buildAutolinkPlan(
     }
   }
 
+  // Sort operations: deletes first to free up space, then creates/updates
+  operations.sort((a, b) => {
+    const order = {delete: 0, update: 1, create: 2};
+    return order[a.kind] - order[b.kind];
+  });
+
   return {
     operations,
     metrics: {
