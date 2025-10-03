@@ -12,7 +12,7 @@ describe('applyAutolinkOp', () => {
       okCreate('TEST', operation.urlTemplate, 123)
     );
 
-    await applyAutolinkOp(env.githubMocks.octokit, env.owner, env.repo, operation, env.mockCore);
+    await applyAutolinkOp(env.githubClient, operation, env.mockCore);
 
     expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledWith({
       owner: env.owner,
@@ -32,7 +32,7 @@ describe('applyAutolinkOp', () => {
       okCreate('UPDATE', operation.urlTemplate, 789)
     );
 
-    await applyAutolinkOp(env.githubMocks.octokit, env.owner, env.repo, operation, env.mockCore);
+    await applyAutolinkOp(env.githubClient, operation, env.mockCore);
 
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
       owner: env.owner,
@@ -54,7 +54,7 @@ describe('applyAutolinkOp', () => {
 
     env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue(okDelete(789));
 
-    await applyAutolinkOp(env.githubMocks.octokit, env.owner, env.repo, operation, env.mockCore);
+    await applyAutolinkOp(env.githubClient, operation, env.mockCore);
 
     expect(env.githubMocks.octokit.rest.repos.deleteAutolink).toHaveBeenCalledWith({
       owner: env.owner,
@@ -79,7 +79,7 @@ describe('applyAutolinkPlan', () => {
     );
     env.githubMocks.octokit.rest.repos.deleteAutolink.mockResolvedValue(okDelete(123));
 
-    const result = await applyAutolinkPlan(env.githubMocks.octokit, env.owner, env.repo, operations, env.mockCore);
+    const result = await applyAutolinkPlan(env.githubClient, operations, env.mockCore);
 
     expect(result).toBe(2);
     expect(env.githubMocks.octokit.rest.repos.createAutolink).toHaveBeenCalledTimes(1);
@@ -94,7 +94,7 @@ describe('applyAutolinkPlan', () => {
 
     env.githubMocks.octokit.rest.repos.createAutolink.mockRejectedValue(new Error('GitHub API error'));
 
-    expect(applyAutolinkPlan(env.githubMocks.octokit, env.owner, env.repo, operations, env.mockCore))
+    expect(applyAutolinkPlan(env.githubClient, operations, env.mockCore))
       .rejects.toThrow('GitHub API error');
 
     expect(env.mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Failed to apply create operation for NEW-'));

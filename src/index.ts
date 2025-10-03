@@ -57,7 +57,8 @@ if (process.env.GITHUB_ACTIONS && process.env.NODE_ENV !== 'test') {
 
 export {jiraClientFactory} from './jira-client';
 export type {JiraClient} from './jira-client';
-export {getExistingAutolinks, createAutolink, deleteAutolink} from './github';
+export {githubClientFactory} from './github-client';
+export type {GitHubClient} from './github-client';
 export {buildAutolinkPlan} from './plan';
 export type {AutolinkOp} from './types';
 export {applyAutolinkPlan, applyAutolinkPlanDryRun} from './apply';

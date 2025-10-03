@@ -5,11 +5,14 @@ import { clearFetchMocks } from './fetch';
 import type { DeepMock } from './mock-utils';
 import type { JiraClient } from '../jira-client';
 import { jiraClientFactory } from '../jira-client';
+import type { GitHubClient } from '../github-client';
+import { githubClientFactory } from '../github-client';
 import type { Dependencies } from '../types';
 
 export interface TestEnv {
   mockCore: DeepMock<typeof core>;
   githubMocks: GitHubMocks;
+  githubClient: GitHubClient;
   jiraClient: JiraClient;
   deps: Dependencies;
   owner: string;
@@ -30,6 +33,9 @@ export function createTestEnv(options: TestEnvOptions = {}): TestEnv {
   const mockCore = createMockCore(options?.inputs ?? {});
   const githubMocks = createGitHubMocks(owner, repo);
 
+  // Create GitHub client using the mocked octokit
+  const githubClient = githubClientFactory(githubMocks.octokit, owner, repo);
+
   // Create a real jiraClient that will use mocked fetch responses
   const jiraClient = jiraClientFactory(
     'https://example.atlassian.net',
@@ -46,6 +52,7 @@ export function createTestEnv(options: TestEnvOptions = {}): TestEnv {
   return {
     mockCore,
     githubMocks,
+    githubClient,
     jiraClient,
     deps,
     owner,

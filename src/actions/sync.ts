@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import {Dependencies} from '../types';
-import {getExistingAutolinks} from '../github';
+import {githubClientFactory} from '../github-client';
 import {buildAutolinkPlan} from '../plan';
 import {applyAutolinkPlan, applyAutolinkPlanDryRun} from '../apply';
 import {mapJiraError} from '../mapJiraError';
@@ -23,6 +23,7 @@ export async function executeSyncAction({
 
   const [owner, repo] = repository.split('/');
   const octokit = githubLib.getOctokit(inputs.githubToken);
+  const githubClient = githubClientFactory(octokit, owner, repo);
 
   coreLib.info(`Syncing autolinks for ${repository}`);
   coreLib.info(`JIRA URL: ${inputs.jiraUrl}`);
@@ -67,7 +68,7 @@ export async function executeSyncAction({
 
   // Fetch existing autolinks
   coreLib.info('Fetching existing autolinks...');
-  const existingAutolinks = await getExistingAutolinks(octokit, owner, repo, coreLib);
+  const existingAutolinks = await githubClient.getExistingAutolinks(coreLib);
   coreLib.info(`Found ${existingAutolinks.length} existing autolinks`);
 
   // Build execution plan
@@ -79,7 +80,7 @@ export async function executeSyncAction({
   const dryRun = coreLib.getInput('dry-run')?.toLowerCase() === 'true';
   const operationsApplied = dryRun
     ? applyAutolinkPlanDryRun(plan.operations, coreLib)
-    : await applyAutolinkPlan(octokit, owner, repo, plan.operations, coreLib);
+    : await applyAutolinkPlan(githubClient, plan.operations, coreLib);
 
   coreLib.info('Autolink sync completed successfully');
 
