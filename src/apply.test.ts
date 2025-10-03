@@ -113,7 +113,8 @@ describe('applyAutolinkPlan', () => {
     let concurrentCount = 0;
     let maxConcurrent = 0;
 
-    env.githubMocks.octokit.rest.repos.createAutolink.mockImplementation(async (params: any) => {
+    // @ts-expect-error - mockImplementation expects Octokit function signature with defaults/endpoint properties
+    env.githubMocks.octokit.rest.repos.createAutolink.mockImplementation(async (params?: any) => {
       const key = params.key_prefix;
       concurrentCount++;
       maxConcurrent = Math.max(maxConcurrent, concurrentCount);
@@ -157,7 +158,8 @@ describe('applyAutolinkPlan', () => {
     let concurrentCount = 0;
     let maxConcurrent = 0;
 
-    env.githubMocks.octokit.rest.repos.createAutolink.mockImplementation(async (params: any) => {
+    // @ts-expect-error - mockImplementation expects Octokit function signature with defaults/endpoint properties
+    env.githubMocks.octokit.rest.repos.createAutolink.mockImplementation(async (params?: any) => {
       concurrentCount++;
       maxConcurrent = Math.max(maxConcurrent, concurrentCount);
 
@@ -185,7 +187,8 @@ describe('applyAutolinkPlan', () => {
 
     const completedOperations: string[] = [];
 
-    env.githubMocks.octokit.rest.repos.createAutolink.mockImplementation(async (params: any) => {
+    // @ts-expect-error - mockImplementation expects Octokit function signature with defaults/endpoint properties
+    env.githubMocks.octokit.rest.repos.createAutolink.mockImplementation(async (params?: any) => {
       const key = params.key_prefix;
 
       // Simulate async work
