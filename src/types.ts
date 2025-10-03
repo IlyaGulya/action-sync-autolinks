@@ -7,6 +7,7 @@ export interface JiraProject {
   key: string;
   name: string;
   id: string;
+  projectTypeKey?: string;
   projectCategory?: {
     id: string;
     key: string;

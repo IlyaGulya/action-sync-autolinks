@@ -96,6 +96,7 @@ export function jiraClientFactory(
         key: project.key,
         name: project.name,
         id: project.id,
+        projectTypeKey: project.projectTypeKey,
         projectCategory: project.projectCategory ? {
           id: project.projectCategory.id,
           key: project.projectCategory.name, // Use name as key for backward compatibility
