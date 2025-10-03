@@ -19,6 +19,7 @@ describe('validateInputs', () => {
       jiraUsername: 'user@example.com',
       jiraApiToken: 'api-token',
       projectCategoryFilter: undefined,
+      maxParallelRequests: 5,
     });
   });
 
@@ -247,6 +248,7 @@ describe('validateSyncInputs', () => {
       projectCategoryFilter: undefined,
       projectTypeFilter: undefined,
       projectQuery: undefined,
+      maxParallelRequests: 5,
     });
   });
 
@@ -313,6 +315,85 @@ describe('validateSyncInputs', () => {
     expect(result.projectCategoryFilter).toEqual(['cat1', 'cat2']);
     expect(result.projectTypeFilter).toEqual(['software']);
     expect(result.projectQuery).toBe('api');
+  });
+
+  test('uses default max-parallel-requests of 5 when not provided', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+    });
+
+    const result = validateSyncInputs(mockCore);
+
+    expect(result.maxParallelRequests).toBe(5);
+  });
+
+  test('accepts custom max-parallel-requests value', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      'max-parallel-requests-github': '10',
+    });
+
+    const result = validateSyncInputs(mockCore);
+
+    expect(result.maxParallelRequests).toBe(10);
+  });
+
+  test('exits when max-parallel-requests is not a number', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      'max-parallel-requests-github': 'not-a-number',
+    });
+    const mockExit = spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as any);
+
+    try {
+      validateSyncInputs(mockCore);
+    } catch (error: any) {
+      // Expected to throw due to mocked process.exit
+    }
+
+    expect(mockCore.error).toHaveBeenCalledWith('Missing required inputs:');
+    expect(mockCore.error).toHaveBeenCalledWith('  - max-parallel-requests-github must be a positive integer');
+    expect(mockCore.setFailed).toHaveBeenCalledWith('Input validation failed');
+    expect(mockExit).toHaveBeenCalledWith(1);
+
+    mockExit.mockRestore();
+  });
+
+  test('exits when max-parallel-requests is zero', () => {
+    const mockCore = createMockCore({
+      'github-token': 'ghp_token',
+      'jira-url': 'https://example.atlassian.net',
+      'jira-username': 'user@example.com',
+      'jira-api-token': 'api-token',
+      'max-parallel-requests-github': '0',
+    });
+    const mockExit = spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as any);
+
+    try {
+      validateSyncInputs(mockCore);
+    } catch (error: any) {
+      // Expected to throw due to mocked process.exit
+    }
+
+    expect(mockCore.error).toHaveBeenCalledWith('Missing required inputs:');
+    expect(mockCore.error).toHaveBeenCalledWith('  - max-parallel-requests-github must be a positive integer');
+    expect(mockCore.setFailed).toHaveBeenCalledWith('Input validation failed');
+    expect(mockExit).toHaveBeenCalledWith(1);
+
+    mockExit.mockRestore();
   });
 });
 

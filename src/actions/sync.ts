@@ -80,7 +80,7 @@ export async function executeSyncAction({
   const dryRun = coreLib.getInput('dry-run')?.toLowerCase() === 'true';
   const operationsApplied = dryRun
     ? applyAutolinkPlanDryRun(plan.operations, coreLib)
-    : await applyAutolinkPlan(githubClient, plan.operations, coreLib);
+    : await applyAutolinkPlan(githubClient, plan.operations, inputs.maxParallelRequests, coreLib);
 
   coreLib.info('Autolink sync completed successfully');
 

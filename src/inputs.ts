@@ -14,6 +14,7 @@ export interface SyncActionInputs extends JiraAuthInputs {
   projectCategoryFilter?: string[];
   projectTypeFilter?: string[];
   projectQuery?: string;
+  maxParallelRequests: number;
 }
 
 // List-categories action inputs (only JIRA auth)
@@ -100,6 +101,14 @@ export function validateSyncInputs(coreLib: typeof core): SyncActionInputs {
   const githubToken = coreLib.getInput('github-token');
   if (!githubToken) validationErrors.push('github-token is required');
 
+  // Parse max-parallel-requests-github (default: 5)
+  const maxParallelRequestsInput = coreLib.getInput('max-parallel-requests-github') || '5';
+  const maxParallelRequests = parseInt(maxParallelRequestsInput, 10);
+
+  if (isNaN(maxParallelRequests) || maxParallelRequests < 1) {
+    validationErrors.push('max-parallel-requests-github must be a positive integer');
+  }
+
   if (validationErrors.length > 0) {
     coreLib.error('Missing required inputs:');
     for (const error of validationErrors) {
@@ -114,6 +123,7 @@ export function validateSyncInputs(coreLib: typeof core): SyncActionInputs {
   return {
     ...jiraAuth,
     githubToken,
+    maxParallelRequests,
     ...filters
   };
 }

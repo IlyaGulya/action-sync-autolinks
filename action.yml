@@ -37,6 +37,10 @@ inputs:
   filter-project-query:
     description: 'Filter JIRA projects by literal string matching project key or name (case insensitive) (used for sync action)'
     required: false
+  max-parallel-requests-github:
+    description: 'Maximum number of parallel GitHub API requests (default: 5)'
+    required: false
+    default: '5'
 
 outputs:
   projects-synced:

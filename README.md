@@ -14,9 +14,10 @@ This ensures that issue references (e.g., `PROJECT-123`) in issues, pull request
 - Fetches all JIRA projects from your instance
 - Creates autolinks for each project key (e.g., `PROJECT-` → `https://your-jira.com/browse/PROJECT-123`)
 - Updates existing autolinks if JIRA URL changes
-- Removes obsolete JIRA autolinks when projects are deleted
+- Removes obsolete JIRA autolinks when projects are deleted (delete operations are prioritized for faster cleanup)
 - Preserves non-JIRA autolinks
-- Filter projects by category (supports GitHub's 500 autolinks limit)
+- **Parallel execution** of GitHub API requests with configurable concurrency for faster syncing
+- Filter projects by category, type, or name (supports GitHub's 500 autolinks limit)
 - Discover available project categories
 
 ## Usage
@@ -53,6 +54,7 @@ jobs:
     jira-api-token: ${{ vars.JIRA_API_TOKEN }}
     repository: 'owner/repo'  # Optional: specify different repo
     dry-run: 'true'  # Optional: test changes without applying them
+    max-parallel-requests-github: '10'  # Optional: control GitHub API concurrency (default: 5)
 ```
 
 ### Filtering Projects
@@ -66,10 +68,10 @@ GitHub has a limit of 500 autolinks per repository. If your JIRA instance has mo
 ```yaml
 - uses: IlyaGulya/action-sync-autolinks@master
   with:
+    action: 'list-categories'  # Discovery mode - lists categories and exits
     jira-url: ${{ secrets.JIRA_URL }}
     jira-username: ${{ vars.JIRA_USERNAME }}
     jira-api-token: ${{ secrets.JIRA_API_TOKEN }}
-    list-categories: 'true'  # Discovery mode - lists categories and exits
 ```
 
 This will output available categories:
@@ -140,22 +142,25 @@ Valid types: `business`, `service_desk`, `software`
 
 | Input                          | Description                                                                       | Required | Default                    |
 |--------------------------------|-----------------------------------------------------------------------------------|----------|----------------------------|
-| `github-token`                 | GitHub token for API access                                                       | Yes      | `${{ github.token }}`      |
+| `action`                       | Action to perform: `sync` (default) or `list-categories`                          | No       | `sync`                     |
+| `github-token`                 | GitHub token for API access (required for sync action)                            | No*      | `${{ github.token }}`      |
 | `jira-url`                     | JIRA instance URL (e.g., `https://company.atlassian.net`)                         | Yes      | -                          |
 | `jira-username`                | JIRA username/email                                                               | Yes      | -                          |
 | `jira-api-token`               | JIRA API token                                                                    | Yes      | -                          |
-| `repository`                   | Repository in format `owner/repo`                                                 | No       | `${{ github.repository }}` |
-| `dry-run`                      | Run in dry-run mode (plan only, no changes)                                       | No       | `false`                    |
+| `repository`                   | Repository in format `owner/repo` (used for sync action)                          | No       | `${{ github.repository }}` |
+| `dry-run`                      | Run in dry-run mode (plan only, no changes) (used for sync action)                | No       | `false`                    |
 | `filter-project-category-ids`  | Filter JIRA projects by category ID (comma-separated for multiple)                | No       | -                          |
 | `filter-project-type`          | Filter JIRA projects by type (comma-separated: business, service_desk, software)  | No       | -                          |
 | `filter-project-query`         | Filter JIRA projects by literal string matching project key or name               | No       | -                          |
-| `list-categories`              | List all available JIRA project categories and exit (no sync performed)           | No       | `false`                    |
+| `max-parallel-requests-github` | Maximum number of parallel GitHub API requests (used for sync action)             | No       | `5`                        |
+
+*Required for `sync` action only
 
 ## Outputs
 
-| Output                | Description                                            |
-|-----------------------|--------------------------------------------------------|
-| `projects-synced`     | Number of JIRA projects processed                      |
+| Output                | Description                                                    |
+|-----------------------|----------------------------------------------------------------|
+| `projects-synced`     | Number of JIRA projects processed                              |
 | `autolinks-processed` | Number of autolink operations performed (create/update/delete) |
 
 ## Setup
@@ -185,11 +190,14 @@ The action requires:
 
 1. **Fetch JIRA Projects**: Uses JIRA REST API to get all accessible projects
 2. **Get Existing Autolinks**: Retrieves current repository autolinks via GitHub API
-3. **Sync Process**:
+3. **Build Plan**: Compares JIRA projects with existing autolinks to determine operations needed
+4. **Execute Sync** (with parallel execution):
+   - Delete operations are prioritized and executed first for faster cleanup
    - Creates new autolinks for JIRA projects that don't have them
    - Updates existing autolinks if the JIRA URL changed
-   - Removes obsolete JIRA autolinks (preserves non-JIRA ones)
-4. **Result**: JIRA references like `PROJ-123` automatically link to `https://your-jira.com/browse/PROJ-123`
+   - Operations run in parallel (configurable via `max-parallel-requests-github`) for faster syncing
+   - Preserves non-JIRA autolinks
+5. **Result**: JIRA references like `PROJ-123` automatically link to `https://your-jira.com/browse/PROJ-123`
 
 ## Example Output
 
@@ -221,6 +229,12 @@ After running, references in issues and PRs will automatically link:
 ### Autolink Creation Fails
 - Repository admin permissions required for autolink management
 - Check if autolink limits are reached (GitHub has a 500 autolinks limit per repository)
+
+### Performance Tuning
+- **Default**: The action runs 5 parallel GitHub API requests by default
+- **Increase concurrency**: For faster syncing with many projects, increase `max-parallel-requests-github` (e.g., `10` or `20`)
+- **Decrease concurrency**: If hitting rate limits, lower `max-parallel-requests-github` to `1` or `2`
+- **Note**: Higher concurrency may trigger GitHub API rate limits on large operations
 
 ## License
 
