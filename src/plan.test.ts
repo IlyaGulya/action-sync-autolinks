@@ -54,6 +54,23 @@ describe('buildAutolinkPlan', () => {
     });
   });
 
+  test('updates autolinks that are alphanumeric (Jira keys are numeric)', () => {
+    const jiraProjects = [jira.project('LEGACY')];
+    const existingAutolinks = [
+      github.autolink(10, 'LEGACY', urls.jiraBrowse('LEGACY'), true)
+    ];
+
+    const plan = buildAutolinkPlan(jiraProjects, existingAutolinks, urls.jira);
+
+    expect(plan.operations).toHaveLength(1);
+    expect(plan.operations[0]).toEqual({
+      kind: 'update',
+      autolinkId: 10,
+      keyPrefix: 'LEGACY-',
+      urlTemplate: urls.jiraBrowse('LEGACY')
+    });
+  });
+
   test('deletes obsolete JIRA autolinks', () => {
     const jiraProjects: import('./types').JiraProject[] = [];
     const existingAutolinks = github.autolinks([

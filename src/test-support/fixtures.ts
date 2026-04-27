@@ -34,11 +34,11 @@ export const jira = {
 };
 
 export const github = {
-  autolink: (id: number, key: string, url: string): GithubAutolink => ({
+  autolink: (id: number, key: string, url: string, isAlphanumeric = false): GithubAutolink => ({
     id,
     key_prefix: `${key}-`,
     url_template: url,
-    is_alphanumeric: true,
+    is_alphanumeric: isAlphanumeric,
   } as GithubAutolink),
 
   autolinks: (data: Array<{ id: number; key: string; url: string }>): GithubAutolink[] =>

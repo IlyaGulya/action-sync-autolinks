@@ -19,7 +19,7 @@ describe('applyAutolinkOp', () => {
       repo: env.repo,
       key_prefix: 'TEST-',
       url_template: 'https://example.atlassian.net/browse/TEST-<num>',
-      is_alphanumeric: true,
+      is_alphanumeric: false,
     });
     expect(env.mockCore.info).toHaveBeenCalledWith('Creating autolink for TEST- -> https://example.atlassian.net/browse/TEST-<num>');
   });
@@ -44,7 +44,7 @@ describe('applyAutolinkOp', () => {
       repo: env.repo,
       key_prefix: 'UPDATE-',
       url_template: 'https://new.atlassian.net/browse/UPDATE-<num>',
-      is_alphanumeric: true,
+      is_alphanumeric: false,
     });
     expect(env.mockCore.info).toHaveBeenCalledWith('Updating autolink 456 for UPDATE- -> https://new.atlassian.net/browse/UPDATE-<num>');
   });

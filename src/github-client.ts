@@ -48,7 +48,7 @@ export function githubClientFactory(
           repo,
           key_prefix: keyPrefix,
           url_template: urlTemplate,
-          is_alphanumeric: true,
+          is_alphanumeric: false,
         })
       );
       coreLib.debug?.(`Created autolink for ${keyPrefix}: ${urlTemplate}`);

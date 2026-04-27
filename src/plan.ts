@@ -40,7 +40,7 @@ export function buildAutolinkPlan(
         keyPrefix: keyPrefix,
         urlTemplate: urlTemplate,
       });
-    } else if (!urlsEqual(existing.url_template, urlTemplate)) {
+    } else if (!urlsEqual(existing.url_template, urlTemplate) || existing.is_alphanumeric) {
       operations.push({
         kind: 'update',
         autolinkId: existing.id,

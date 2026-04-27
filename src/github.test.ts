@@ -29,7 +29,7 @@ describe('GitHub client', () => {
         repo: env.repo,
         key_prefix: 'TEST-',
         url_template: 'https://test.com/<num>',
-        is_alphanumeric: true
+        is_alphanumeric: false
       });
     });
 

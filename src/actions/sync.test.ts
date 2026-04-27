@@ -74,7 +74,7 @@ describe('executeSyncAction', () => {
       repo: env.repo,
       key_prefix: 'NEW-',
       url_template: urls.jiraBrowse('NEW'),
-      is_alphanumeric: true
+      is_alphanumeric: false
     });
 
     expect(env.mockCore.setOutput).toHaveBeenCalledWith('projects-synced', 1);
@@ -164,7 +164,7 @@ describe('executeSyncAction', () => {
         repo: env.repo,
         key_prefix: 'RETRY-',
         url_template: urls.jiraBrowse('RETRY'),
-        is_alphanumeric: true
+        is_alphanumeric: false
       });
     } finally {
       globalThis.setTimeout = originalSetTimeout;
